@@ -1,0 +1,6 @@
+{
+    "iterations_per_case": 5,
+    "improvement_threshold": 0.2,
+    "max_retries": 3,
+    "retry_delay": 5
+}

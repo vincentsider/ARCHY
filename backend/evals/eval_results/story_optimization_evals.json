@@ -1,0 +1,938 @@
+[
+    {
+        "id": "25dcb92e-13e0-4b0f-b4a8-649b27783898",
+        "timestamp": "2024-10-16T11:06:41.053901",
+        "results": [
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "As a user, I want to log in to the system."
+                    }
+                ],
+                "expected_function": "optimize_story",
+                "actual_function": [
+                    "error",
+                    "error",
+                    "error",
+                    "error",
+                    "error"
+                ],
+                "actual_message": [
+                    "An error occurred while optimizing the story: object ChatCompletion can't be used in 'await' expression",
+                    "An error occurred while optimizing the story: cannot reuse already awaited coroutine",
+                    "An error occurred while optimizing the story: cannot reuse already awaited coroutine",
+                    "An error occurred while optimizing the story: cannot reuse already awaited coroutine",
+                    "An error occurred while optimizing the story: cannot reuse already awaited coroutine"
+                ],
+                "improvement_scores": [
+                    0.1793103448275862,
+                    0.2222222222222222,
+                    0.2222222222222222,
+                    0.2222222222222222,
+                    0.2222222222222222
+                ],
+                "case_accuracy": "0.00%",
+                "average_improvement": 0.213639846743295
+            },
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "The system should allow users to reset their passwords."
+                    }
+                ],
+                "expected_function": "optimize_story",
+                "actual_function": [
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit"
+                ],
+                "actual_message": [
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute"
+                ],
+                "improvement_scores": [
+                    0.08695652173913043,
+                    0.08695652173913043,
+                    0.08695652173913043,
+                    0.08695652173913043,
+                    0.08695652173913043
+                ],
+                "case_accuracy": "0.00%",
+                "average_improvement": 0.08695652173913043
+            },
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Users should be able to view their account balance."
+                    }
+                ],
+                "expected_function": "optimize_story",
+                "actual_function": [
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit"
+                ],
+                "actual_message": [
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute"
+                ],
+                "improvement_scores": [
+                    0.24615384615384617,
+                    0.24615384615384617,
+                    0.24615384615384617,
+                    0.24615384615384617,
+                    0.24615384615384617
+                ],
+                "case_accuracy": "0.00%",
+                "average_improvement": 0.24615384615384617
+            },
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "As an admin, I need to be able to manage user accounts."
+                    }
+                ],
+                "expected_function": "optimize_story",
+                "actual_function": [
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit"
+                ],
+                "actual_message": [
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute"
+                ],
+                "improvement_scores": [
+                    0.17391304347826086,
+                    0.17391304347826086,
+                    0.17391304347826086,
+                    0.17391304347826086,
+                    0.17391304347826086
+                ],
+                "case_accuracy": "0.00%",
+                "average_improvement": 0.17391304347826086
+            },
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "The application should send email notifications for important updates."
+                    }
+                ],
+                "expected_function": "optimize_story",
+                "actual_function": [
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit"
+                ],
+                "actual_message": [
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute"
+                ],
+                "improvement_scores": [
+                    0.21428571428571427,
+                    0.21428571428571427,
+                    0.21428571428571427,
+                    0.21428571428571427,
+                    0.21428571428571427
+                ],
+                "case_accuracy": "0.00%",
+                "average_improvement": 0.21428571428571427
+            },
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "What's the weather like today?"
+                    }
+                ],
+                "expected_function": "error",
+                "actual_function": [
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit"
+                ],
+                "actual_message": [
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute"
+                ],
+                "improvement_scores": [
+                    0.2727272727272727,
+                    0.2727272727272727,
+                    0.2727272727272727,
+                    0.2727272727272727,
+                    0.2727272727272727
+                ],
+                "case_accuracy": "0.00%",
+                "average_improvement": 0.2727272727272727
+            },
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Tell me a joke."
+                    }
+                ],
+                "expected_function": "error",
+                "actual_function": [
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit"
+                ],
+                "actual_message": [
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute"
+                ],
+                "improvement_scores": [
+                    0.27586206896551724,
+                    0.27586206896551724,
+                    0.27586206896551724,
+                    0.27586206896551724,
+                    0.27586206896551724
+                ],
+                "case_accuracy": "0.00%",
+                "average_improvement": 0.27586206896551724
+            }
+        ],
+        "correct_evals": 0,
+        "total_evals": 35,
+        "overall_accuracy_percent": "0.00%",
+        "overall_improvement_score": "0.21"
+    },
+    {
+        "id": "c73d206f-7999-4803-87c9-67b837f96d26",
+        "timestamp": "2024-10-16T11:08:40.771416",
+        "results": [
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "As a user, I want to log in to the system."
+                    }
+                ],
+                "expected_function": "optimize_story",
+                "actual_function": [
+                    "error",
+                    "error",
+                    "error",
+                    "error",
+                    "error"
+                ],
+                "actual_message": [
+                    "An error occurred while optimizing the story: object ChatCompletion can't be used in 'await' expression",
+                    "An error occurred while optimizing the story: object ChatCompletion can't be used in 'await' expression",
+                    "An error occurred while optimizing the story: object ChatCompletion can't be used in 'await' expression",
+                    "An error occurred while optimizing the story: object ChatCompletion can't be used in 'await' expression",
+                    "An error occurred while optimizing the story: object ChatCompletion can't be used in 'await' expression"
+                ],
+                "improvement_scores": [
+                    0.1793103448275862,
+                    0.1793103448275862,
+                    0.1793103448275862,
+                    0.1793103448275862,
+                    0.1793103448275862
+                ],
+                "case_accuracy": "0.00%",
+                "average_improvement": 0.1793103448275862
+            },
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "The system should allow users to reset their passwords."
+                    }
+                ],
+                "expected_function": "optimize_story",
+                "actual_function": [
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit"
+                ],
+                "actual_message": [
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute"
+                ],
+                "improvement_scores": [
+                    0.08695652173913043,
+                    0.08695652173913043,
+                    0.08695652173913043,
+                    0.08695652173913043,
+                    0.08695652173913043
+                ],
+                "case_accuracy": "0.00%",
+                "average_improvement": 0.08695652173913043
+            },
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Users should be able to view their account balance."
+                    }
+                ],
+                "expected_function": "optimize_story",
+                "actual_function": [
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit"
+                ],
+                "actual_message": [
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute"
+                ],
+                "improvement_scores": [
+                    0.24615384615384617,
+                    0.24615384615384617,
+                    0.24615384615384617,
+                    0.24615384615384617,
+                    0.24615384615384617
+                ],
+                "case_accuracy": "0.00%",
+                "average_improvement": 0.24615384615384617
+            },
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "As an admin, I need to be able to manage user accounts."
+                    }
+                ],
+                "expected_function": "optimize_story",
+                "actual_function": [
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit"
+                ],
+                "actual_message": [
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute"
+                ],
+                "improvement_scores": [
+                    0.17391304347826086,
+                    0.17391304347826086,
+                    0.17391304347826086,
+                    0.17391304347826086,
+                    0.17391304347826086
+                ],
+                "case_accuracy": "0.00%",
+                "average_improvement": 0.17391304347826086
+            },
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "The application should send email notifications for important updates."
+                    }
+                ],
+                "expected_function": "optimize_story",
+                "actual_function": [
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit"
+                ],
+                "actual_message": [
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute"
+                ],
+                "improvement_scores": [
+                    0.21428571428571427,
+                    0.21428571428571427,
+                    0.21428571428571427,
+                    0.21428571428571427,
+                    0.21428571428571427
+                ],
+                "case_accuracy": "0.00%",
+                "average_improvement": 0.21428571428571427
+            },
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "What's the weather like today?"
+                    }
+                ],
+                "expected_function": "error",
+                "actual_function": [
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit"
+                ],
+                "actual_message": [
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute"
+                ],
+                "improvement_scores": [
+                    0.2727272727272727,
+                    0.2727272727272727,
+                    0.2727272727272727,
+                    0.2727272727272727,
+                    0.2727272727272727
+                ],
+                "case_accuracy": "0.00%",
+                "average_improvement": 0.2727272727272727
+            },
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Tell me a joke."
+                    }
+                ],
+                "expected_function": "error",
+                "actual_function": [
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit"
+                ],
+                "actual_message": [
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute"
+                ],
+                "improvement_scores": [
+                    0.27586206896551724,
+                    0.27586206896551724,
+                    0.27586206896551724,
+                    0.27586206896551724,
+                    0.27586206896551724
+                ],
+                "case_accuracy": "0.00%",
+                "average_improvement": 0.27586206896551724
+            }
+        ],
+        "correct_evals": 0,
+        "total_evals": 35,
+        "overall_accuracy_percent": "0.00%",
+        "overall_improvement_score": "0.21"
+    },
+    {
+        "id": "671711c1-46bc-499a-88ef-30c1fff35532",
+        "timestamp": "2024-10-16T11:08:59.786211",
+        "results": [
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "As a user, I want to log in to the system."
+                    }
+                ],
+                "expected_function": "optimize_story",
+                "actual_function": [
+                    "error",
+                    "error",
+                    "error",
+                    "error",
+                    "error"
+                ],
+                "actual_message": [
+                    "An error occurred while optimizing the story: object ChatCompletion can't be used in 'await' expression",
+                    "An error occurred while optimizing the story: object ChatCompletion can't be used in 'await' expression",
+                    "An error occurred while optimizing the story: object ChatCompletion can't be used in 'await' expression",
+                    "An error occurred while optimizing the story: object ChatCompletion can't be used in 'await' expression",
+                    "An error occurred while optimizing the story: object ChatCompletion can't be used in 'await' expression"
+                ],
+                "improvement_scores": [
+                    0.1793103448275862,
+                    0.1793103448275862,
+                    0.1793103448275862,
+                    0.1793103448275862,
+                    0.1793103448275862
+                ],
+                "case_accuracy": "0.00%",
+                "average_improvement": 0.1793103448275862
+            },
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "The system should allow users to reset their passwords."
+                    }
+                ],
+                "expected_function": "optimize_story",
+                "actual_function": [
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit"
+                ],
+                "actual_message": [
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute"
+                ],
+                "improvement_scores": [
+                    0.08695652173913043,
+                    0.08695652173913043,
+                    0.08695652173913043,
+                    0.08695652173913043,
+                    0.08695652173913043
+                ],
+                "case_accuracy": "0.00%",
+                "average_improvement": 0.08695652173913043
+            },
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Users should be able to view their account balance."
+                    }
+                ],
+                "expected_function": "optimize_story",
+                "actual_function": [
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit"
+                ],
+                "actual_message": [
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute"
+                ],
+                "improvement_scores": [
+                    0.24615384615384617,
+                    0.24615384615384617,
+                    0.24615384615384617,
+                    0.24615384615384617,
+                    0.24615384615384617
+                ],
+                "case_accuracy": "0.00%",
+                "average_improvement": 0.24615384615384617
+            },
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "As an admin, I need to be able to manage user accounts."
+                    }
+                ],
+                "expected_function": "optimize_story",
+                "actual_function": [
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit"
+                ],
+                "actual_message": [
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute"
+                ],
+                "improvement_scores": [
+                    0.17391304347826086,
+                    0.17391304347826086,
+                    0.17391304347826086,
+                    0.17391304347826086,
+                    0.17391304347826086
+                ],
+                "case_accuracy": "0.00%",
+                "average_improvement": 0.17391304347826086
+            },
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "The application should send email notifications for important updates."
+                    }
+                ],
+                "expected_function": "optimize_story",
+                "actual_function": [
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit"
+                ],
+                "actual_message": [
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute"
+                ],
+                "improvement_scores": [
+                    0.21428571428571427,
+                    0.21428571428571427,
+                    0.21428571428571427,
+                    0.21428571428571427,
+                    0.21428571428571427
+                ],
+                "case_accuracy": "0.00%",
+                "average_improvement": 0.21428571428571427
+            },
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "What's the weather like today?"
+                    }
+                ],
+                "expected_function": "error",
+                "actual_function": [
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit"
+                ],
+                "actual_message": [
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute"
+                ],
+                "improvement_scores": [
+                    0.2727272727272727,
+                    0.2727272727272727,
+                    0.2727272727272727,
+                    0.2727272727272727,
+                    0.2727272727272727
+                ],
+                "case_accuracy": "0.00%",
+                "average_improvement": 0.2727272727272727
+            },
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Tell me a joke."
+                    }
+                ],
+                "expected_function": "error",
+                "actual_function": [
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit"
+                ],
+                "actual_message": [
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute"
+                ],
+                "improvement_scores": [
+                    0.27586206896551724,
+                    0.27586206896551724,
+                    0.27586206896551724,
+                    0.27586206896551724,
+                    0.27586206896551724
+                ],
+                "case_accuracy": "0.00%",
+                "average_improvement": 0.27586206896551724
+            }
+        ],
+        "correct_evals": 0,
+        "total_evals": 35,
+        "overall_accuracy_percent": "0.00%",
+        "overall_improvement_score": "0.21"
+    },
+    {
+        "id": "35388078-84c6-47c3-b82f-778104fc36a8",
+        "timestamp": "2024-10-16T11:11:58.726709",
+        "results": [
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "As a user, I want to log in to the system."
+                    }
+                ],
+                "expected_function": "optimize_story",
+                "actual_function": [
+                    "optimize_story",
+                    "optimize_story",
+                    "optimize_story",
+                    "optimize_story",
+                    "optimize_story"
+                ],
+                "actual_message": [
+                    "The User Experience Agent will assist in designing the login feature for the system.",
+                    "I have transferred your request to the User Experience Agent for further assistance with logging in to the system.",
+                    "The User Experience Agent will assist in defining the login process for the system.",
+                    "Since you want to log in to the system, I will analyze the technical feasibility and requirements for this user story:\n\n1. **Validation**:\n    - The system needs to validate the user's credentials (username and password) against the database to ensure authentication.\n\n2. **Security**:\n    - Implement secure password hashing techniques to store user passwords securely.\n    - Use encryption protocols (e.g., HTTPS) to transmit login credentials securely.\n\n3. **Session Management**:\n    - Create and manage user sessions to keep track of authenticated users.\n    - Implement session timeout to enhance security.\n\n4. **Error Handling**:\n    - Provide appropriate error messages for incorrect login attempts.\n    - Implement mechanisms like CAPTCHA to prevent brute force attacks.\n\n5. **User Interface**:\n    - Design an intuitive login interface with fields for username and password.\n    - Include features like \"Forgot Password\" and \"Remember Me\" for user convenience.\n\n6. **User Roles**:\n    - Define different user roles (e.g., admin, regular user) and permissions based on login credentials.\n\n7. **Maintenance**:\n    - Ensure the system allows for password reset functionality for users who forget their passwords.\n\nThese considerations will ensure a secure and user-friendly login system within the application.",
+                    "The User Experience Agent will assist in designing the login functionality to meet your requirements."
+                ],
+                "improvement_scores": [
+                    0.4444444444444444,
+                    0.38461538461538464,
+                    0.448,
+                    0.047093451066961,
+                    0.32167832167832167
+                ],
+                "case_accuracy": "100.00%",
+                "average_improvement": 0.32916632036102234
+            },
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "The system should allow users to reset their passwords."
+                    }
+                ],
+                "expected_function": "optimize_story",
+                "actual_function": [
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit"
+                ],
+                "actual_message": [
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute"
+                ],
+                "improvement_scores": [
+                    0.08695652173913043,
+                    0.08695652173913043,
+                    0.08695652173913043,
+                    0.08695652173913043,
+                    0.08695652173913043
+                ],
+                "case_accuracy": "0.00%",
+                "average_improvement": 0.08695652173913043
+            },
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Users should be able to view their account balance."
+                    }
+                ],
+                "expected_function": "optimize_story",
+                "actual_function": [
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit"
+                ],
+                "actual_message": [
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute"
+                ],
+                "improvement_scores": [
+                    0.24615384615384617,
+                    0.24615384615384617,
+                    0.24615384615384617,
+                    0.24615384615384617,
+                    0.24615384615384617
+                ],
+                "case_accuracy": "0.00%",
+                "average_improvement": 0.24615384615384617
+            },
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "As an admin, I need to be able to manage user accounts."
+                    }
+                ],
+                "expected_function": "optimize_story",
+                "actual_function": [
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit"
+                ],
+                "actual_message": [
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute"
+                ],
+                "improvement_scores": [
+                    0.17391304347826086,
+                    0.17391304347826086,
+                    0.17391304347826086,
+                    0.17391304347826086,
+                    0.17391304347826086
+                ],
+                "case_accuracy": "0.00%",
+                "average_improvement": 0.17391304347826086
+            },
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "The application should send email notifications for important updates."
+                    }
+                ],
+                "expected_function": "optimize_story",
+                "actual_function": [
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit"
+                ],
+                "actual_message": [
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute"
+                ],
+                "improvement_scores": [
+                    0.21428571428571427,
+                    0.21428571428571427,
+                    0.21428571428571427,
+                    0.21428571428571427,
+                    0.21428571428571427
+                ],
+                "case_accuracy": "0.00%",
+                "average_improvement": 0.21428571428571427
+            },
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "What's the weather like today?"
+                    }
+                ],
+                "expected_function": "error",
+                "actual_function": [
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit"
+                ],
+                "actual_message": [
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute"
+                ],
+                "improvement_scores": [
+                    0.2727272727272727,
+                    0.2727272727272727,
+                    0.2727272727272727,
+                    0.2727272727272727,
+                    0.2727272727272727
+                ],
+                "case_accuracy": "0.00%",
+                "average_improvement": 0.2727272727272727
+            },
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Tell me a joke."
+                    }
+                ],
+                "expected_function": "error",
+                "actual_function": [
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit",
+                    "rate_limit"
+                ],
+                "actual_message": [
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute",
+                    "5 per 1 minute"
+                ],
+                "improvement_scores": [
+                    0.27586206896551724,
+                    0.27586206896551724,
+                    0.27586206896551724,
+                    0.27586206896551724,
+                    0.27586206896551724
+                ],
+                "case_accuracy": "0.00%",
+                "average_improvement": 0.27586206896551724
+            }
+        ],
+        "correct_evals": 5,
+        "total_evals": 35,
+        "overall_accuracy_percent": "14.29%",
+        "overall_improvement_score": "0.23"
+    }
+]
