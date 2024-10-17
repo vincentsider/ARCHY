@@ -71,7 +71,7 @@ def rate_limit(limit_string):
 # Load configuration
 config = load_config("config.json")  # You can implement this function to load from a file
 
-# Populate tools in config
+# Populate tools in config / tools mapping
 config.tools = {
     "look_up_item": look_up_item,
     "execute_refund": execute_refund,
