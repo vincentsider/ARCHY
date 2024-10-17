@@ -19,11 +19,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from backend.config import Config, load_config
 from backend.swarm.agent import Agent
 from backend.swarm.swarm import Swarm
-from backend.swarm.tools import (
-    look_up_item, execute_refund,
-    transfer_to_technical_requirements, transfer_to_ux,
-    transfer_to_qa, transfer_to_stakeholder_liaison, transfer_to_master
-)
 import logging
 import json
 from functools import lru_cache, wraps
@@ -71,49 +66,15 @@ def rate_limit(limit_string):
 # Load configuration
 config = load_config("config.json")  # You can implement this function to load from a file
 
-# Populate tools in config
-config.tools = {
-    "look_up_item": look_up_item,
-    "execute_refund": execute_refund,
-    "transfer_to_technical_requirements": transfer_to_technical_requirements,
-    "transfer_to_ux": transfer_to_ux,
-    "transfer_to_qa": transfer_to_qa,
-    "transfer_to_stakeholder_liaison": transfer_to_stakeholder_liaison,
-    "transfer_to_master": transfer_to_master,
-}
-
 # Create agents based on configuration
 agents = [
     Agent(
-        name="Master Agent",
-        instructions="You are the Master Agent responsible for coordinating the optimization of user stories. Your role is to analyze the initial user story, decide which specialist agents to involve, and synthesize their inputs into a final, optimized user story. Use your judgment to determine which agents are necessary for each story, and don't hesitate to involve multiple agents if needed. Your goal is to produce a comprehensive, well-rounded user story that covers technical, UX, and business aspects as appropriate. When synthesizing the final user story, ensure it follows the format 'As a user, I want... so that...' followed by a prioritized list of acceptance criteria.",
-        tools=[config.tools[tool] for tool in config.tools if tool.startswith("transfer_to_")],
-        model=config.openai_model
-    ),
-    Agent(
-        name="Technical Requirements Agent",
-        instructions="You are the Technical Requirements Agent. Your role is to analyze user stories from a technical perspective and break them down into specific technical requirements.",
-        tools=[config.tools["transfer_to_master"]],
-        model=config.openai_model
-    ),
-    Agent(
-        name="User Experience Agent",
-        instructions="You are the UX Agent. Your role is to optimize user stories by considering the user experience perspective. Focus on usability, accessibility, and user interface design considerations.",
-        tools=[config.tools["transfer_to_master"]],
-        model=config.openai_model
-    ),
-    Agent(
-        name="Quality Assurance Agent",
-        instructions="You are the QA Agent. Your role is to review and refine user stories to ensure they are testable and meet quality standards. Focus on defining acceptance criteria and potential edge cases.",
-        tools=[config.tools["transfer_to_master"]],
-        model=config.openai_model
-    ),
-    Agent(
-        name="Stakeholder Liaison Agent",
-        instructions="You are the Stakeholder Liaison Agent. Your role is to review the optimized user story and ensure it aligns with business goals and user needs. Provide specific business-related acceptance criteria and suggest any necessary adjustments to meet stakeholder expectations.",
-        tools=[config.tools["transfer_to_master"]],
+        name=agent_config.name,
+        instructions=agent_config.instructions,
+        tools=[config.tools[tool] for tool in agent_config.tools],
         model=config.openai_model
     )
+    for agent_config in config.agents
 ]
 
 # Create the swarm
