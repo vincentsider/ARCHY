@@ -61,7 +61,9 @@ async def run_evals():
             for interaction in case_result['agent_interactions']:
                 if isinstance(interaction, dict):
                     print(f"  Role: {interaction.get('role', 'Unknown')}")
-                    print(f"  Content: {interaction.get('content', 'No content')[:100]}...")
+                    content = interaction.get('content', 'No content')
+                    if content:
+                        print(f"  Content: {content[:100]}...")
                     if interaction.get('tool_calls'):
                         for tool_call in interaction['tool_calls']:
                             print(f"    Tool: {tool_call['function']['name']}")

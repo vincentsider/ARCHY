@@ -1,17 +1,19 @@
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Optional
 from .agent import Agent
 import json
 import asyncio
 import time
 import logging
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
-class Response:
-    def __init__(self, agent: Agent, messages: List[Dict[str, Any]], decision: str = ""):
-        self.agent = agent
-        self.messages = messages
-        self.decision = decision
+class Response(BaseModel):
+    agent: Agent
+    messages: List[Dict[str, Any]] = Field(default_factory=list)
+    optimized: str = ""
+    agent_interactions: List[Dict[str, Any]] = Field(default_factory=list)
+    performance_metrics: Dict[str, Any] = Field(default_factory=dict)
 
 class Swarm:
     def __init__(self, agents: List[Agent]):
@@ -20,31 +22,34 @@ class Swarm:
         if not self.master_agent:
             raise ValueError("Master Agent not found in the list of agents")
         self.current_agent = self.master_agent
-        self.max_iterations = 5  # Default value, can be adjusted
-        self.early_stopping_threshold = 0.8  # Quality threshold for early stopping
+        self.max_iterations = 5
 
-    async def analyze_context(self, message: str) -> str:
-        context_prompt = f"Analyze the following user story and provide a brief summary of its main intent, focusing on the specific task or goal the user wants to achieve. Avoid introducing additional processes or requirements not explicitly mentioned:\n\n{message}"
+    async def analyze_context(self, message: str, epic_context: Optional[str] = None, story_context: Optional[str] = None) -> str:
+        context_prompt = f"Analyze the following user story and provide a brief summary of its main intent, focusing on the specific task or goal the user wants to achieve. Consider the epic and story context if provided. Avoid introducing additional processes or requirements not explicitly mentioned:\n\nUser Story: {message}\n\nEpic Context: {epic_context or 'Not provided'}\n\nStory Context: {story_context or 'Not provided'}"
         context_response = self.master_agent.get_completion([{"role": "user", "content": context_prompt}], [])
         return context_response.choices[0].message.content
 
-    async def process_message(self, message: str, tools_map: Dict, context_analysis: str) -> Tuple[str, List[Dict], Dict[str, Any]]:
+    async def process_message(self, message: str, context_analysis: str) -> Response:
         start_time = time.time()
-        messages = [{"role": "user", "content": message}]
+        messages = [
+            {"role": "system", "content": self.current_agent.instructions},
+            {"role": "user", "content": message},
+            {"role": "system", "content": f"Context Analysis: {context_analysis}"}
+        ]
         agent_interactions = []
-        final_response = ""
         
-        # Add context analysis to messages
-        messages.append({"role": "system", "content": f"Context Analysis: {context_analysis}"})
-        
-        # Consult all agents
-        for agent_name in ["Technical Requirements Agent", "User Experience Agent", "Quality Assurance Agent", "Stakeholder Liaison Agent"]:
-            agent = self.agents[agent_name]
-            response = await self.run_agent(agent, messages + [{"role": "user", "content": f"As the {agent_name}, please provide your specific input for optimizing this user story, focusing only on aspects directly related to the main intent: {context_analysis}"}], tools_map)
+        iterations = 0
+        while iterations < self.max_iterations:
+            response = await self.run_full_turn(messages)
             agent_interactions.extend(response.messages)
             messages.extend(response.messages)
+            self.current_agent = response.agent
 
-        # Generate final summary
+            if self.current_agent == self.master_agent:
+                break
+
+            iterations += 1
+
         final_response = self.generate_final_summary(messages, context_analysis)
 
         end_time = time.time()
@@ -52,72 +57,62 @@ class Swarm:
 
         performance_metrics = {
             "execution_time": execution_time,
-            "iterations_used": len(self.agents),
+            "iterations_used": iterations,
             "quality_score": self.assess_quality(final_response)
         }
 
-        return final_response, agent_interactions, performance_metrics
+        return Response(
+            agent=self.current_agent,
+            messages=messages,
+            optimized=final_response,
+            agent_interactions=agent_interactions,
+            performance_metrics=performance_metrics
+        )
 
-    async def run_agent(self, agent: Agent, messages: List[Dict[str, str]], tools_map: Dict) -> Response:
-        tool_schemas = [agent.function_to_schema(tool) for tool in agent.tools]
-        
-        response = agent.get_completion(messages, tool_schemas)
-        message = response.choices[0].message
-        
-        new_messages = []
-        new_agent = agent
-        decision = "No decision recorded"
+    async def run_full_turn(self, messages: List[Dict[str, str]]) -> Response:
+        num_init_messages = len(messages)
+        messages = messages.copy()
 
-        if message.content:
-            new_messages.append({
-                "role": "assistant",
-                "content": message.content,
-                "agent_name": agent.name,
-                "decision": decision,
-                "tools_used": []
-            })
-            logger.info(f"{agent.name}: {message.content}")
+        while True:
+            tool_schemas = [self.current_agent.function_to_schema(tool) for tool in self.current_agent.tools]
+            tools_map = {tool.__name__: tool for tool in self.current_agent.tools}
 
-        if message.tool_calls:
+            response = self.current_agent.get_completion(messages, tool_schemas)
+            message = response.choices[0].message
+            messages.append({"role": "assistant", "content": message.content})
+
+            if message.content:
+                logger.info(f"{self.current_agent.name}: {message.content}")
+
+            if not message.tool_calls:
+                break
+
             for tool_call in message.tool_calls:
-                result = await self.execute_tool_call(tool_call, tools_map, agent.name)
-                
-                if isinstance(result, str) and result.startswith("HANDOFF:"):
-                    new_agent_name = result.split(":", 1)[1]
-                    decision = f"Transferred to {new_agent_name}"
-                    new_messages.append({
-                        "role": "system",
-                        "content": f"Transferred to {new_agent_name}. Adopt persona immediately.",
-                        "agent_name": agent.name,
-                        "decision": decision,
-                        "tools_used": [tool_call.function.name]
-                    })
-                    break
-                else:
-                    new_messages.append({
-                        "role": "assistant",
-                        "content": None,
-                        "tool_calls": [tool_call.model_dump()],
-                        "agent_name": agent.name,
-                        "decision": "Used tool",
-                        "tools_used": [tool_call.function.name]
-                    })
-                    new_messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": str(result),
-                        "agent_name": agent.name,
-                        "decision": "Tool response",
-                        "tools_used": []
-                    })
+                result = await self.execute_tool_call(tool_call, tools_map)
 
-        return Response(agent=new_agent, messages=new_messages, decision=decision)
+                if isinstance(result, Agent):
+                    self.current_agent = result
+                    result = f"Transferred to {self.current_agent.name}. Adopt persona immediately."
 
-    async def execute_tool_call(self, tool_call, tools_map, agent_name):
+                result_message = {
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "name": tool_call.function.name,
+                    "content": str(result),
+                }
+                messages.append(result_message)
+
+        return Response(agent=self.current_agent, messages=messages[num_init_messages:], optimized="", agent_interactions=[], performance_metrics={})
+
+    async def execute_tool_call(self, tool_call, tools_map):
         name = tool_call.function.name
         args = json.loads(tool_call.function.arguments)
 
-        logger.info(f"{agent_name}: {name}({args})")
+        logger.info(f"{self.current_agent.name}: {name}({args})")
+
+        if name not in tools_map:
+            logger.error(f"Tool '{name}' not found in tools_map")
+            return f"Error: Tool '{name}' not found"
 
         result = tools_map[name](**args)
         if asyncio.iscoroutine(result):
@@ -133,14 +128,12 @@ class Swarm:
         if "Acceptance Criteria:" in final_response:
             score += 0.2
         
-        # Count the number of unique aspects covered
         aspects = ['technical', 'ux', 'business', 'quality']
         covered_aspects = sum(1 for aspect in aspects if aspect.lower() in final_response.lower())
-        score += covered_aspects * 0.075  # Increased weight for aspect coverage
+        score += covered_aspects * 0.075
         
-        # Evaluate the detail level
-        criteria_count = final_response.count("\n") - 1  # Rough estimate of criteria count
-        score += min(criteria_count * 0.025, 0.25)  # Up to 0.25 for detailed criteria
+        criteria_count = final_response.count("\n") - 1
+        score += min(criteria_count * 0.025, 0.25)
         
         return min(score, 1.0)
 
@@ -157,6 +150,7 @@ class Swarm:
         7. Avoid introducing unrelated processes or requirements.
         8. Do not add unnecessary phrases like 'so that I can complete my task efficiently'.
         9. Ensure the final output is cohesive and well-structured.
+        10. Consider the epic context (if provided) to ensure the user story aligns with the broader project goals.
 
         Format the output as follows:
         As a user, I want [improved action] so that [improved outcome].
@@ -176,10 +170,10 @@ class Swarm:
         for attempt in range(max_attempts):
             try:
                 logger.info(f"Generating final summary: Attempt {attempt + 1}")
-                summary_response = self.master_agent.get_completion(summary_message + messages, [])  # No tool schemas
+                summary_response = self.master_agent.get_completion(summary_message + messages, [])
                 final_response = summary_response.choices[0].message.content
                 
-                logger.info(f"Generated response: {final_response[:100]}...")  # Log the first 100 characters
+                logger.info(f"Generated response: {final_response[:100]}...")
                 
                 if self.validate_final_response(final_response):
                     logger.info(f"Successfully generated user story on attempt {attempt + 1}")
@@ -190,7 +184,6 @@ class Swarm:
             except Exception as e:
                 logger.error(f"Error in generate_final_summary attempt {attempt + 1}: {str(e)}")
         
-        # If we still don't have a proper user story, return a basic one based on the original message
         logger.error("Failed to generate a proper user story after multiple attempts. Returning a basic user story.")
         original_message = messages[0]['content']
         return f"As a user, I want {original_message} so that I can complete my task effectively.\n\nAcceptance Criteria:\n1. The system should provide a clear interface for the user action.\n2. The process should be efficient and user-friendly.\n3. The system should provide clear feedback on the success or failure of the action."
@@ -208,12 +201,3 @@ class Swarm:
         if any(criterion.strip().startswith("The system should allow me to As a user,") for criterion in criteria):
             return False
         return True
-
-    def update_max_iterations(self, new_max_iterations: int):
-        self.max_iterations = new_max_iterations
-
-    def update_early_stopping_threshold(self, new_threshold: float):
-        if 0 <= new_threshold <= 1:
-            self.early_stopping_threshold = new_threshold
-        else:
-            raise ValueError("Early stopping threshold must be between 0 and 1")

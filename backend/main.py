@@ -9,20 +9,18 @@ from dotenv import load_dotenv
 import asyncio
 import time
 
-# Load environment variables from the correct location
-dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
-load_dotenv(dotenv_path)
+# Load environment variables
+load_dotenv()
 
 # Add the project root directory to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.config import Config, load_config
 from backend.swarm.agent import Agent
-from backend.swarm.swarm import Swarm
-from backend.swarm.tools import (
-    look_up_item, execute_refund,
-    transfer_to_technical_requirements, transfer_to_ux,
-    transfer_to_qa, transfer_to_stakeholder_liaison, transfer_to_master
+from backend.swarm.swarm import Swarm, Response
+from backend.jira_integration import (
+    fetch_epics, fetch_stories, fetch_subtasks, update_subtask,
+    JiraIntegrationError
 )
 import logging
 import json
@@ -32,17 +30,14 @@ from slowapi.util import get_remote_address
 
 # Enhanced logging configuration
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    filename='app.log',
-    filemode='a'
+    handlers=[
+        logging.FileHandler("app.log"),
+        logging.StreamHandler()
+    ]
 )
 logger = logging.getLogger(__name__)
-
-# Add a stream handler to also log to console
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-logger.addHandler(console_handler)
 
 app = FastAPI()
 
@@ -69,12 +64,31 @@ def rate_limit(limit_string):
     return decorator
 
 # Load configuration
-config = load_config("config.json")  # You can implement this function to load from a file
+config = load_config("config.json")
 
-# Populate tools in config
-config.tools = {
-    "look_up_item": look_up_item,
-    "execute_refund": execute_refund,
+# Define tools as named functions
+def transfer_to_technical_requirements():
+    """Transfer to the Technical Requirements Agent."""
+    return "HANDOFF:Technical Requirements Agent"
+
+def transfer_to_ux():
+    """Transfer to the User Experience Agent."""
+    return "HANDOFF:User Experience Agent"
+
+def transfer_to_qa():
+    """Transfer to the Quality Assurance Agent."""
+    return "HANDOFF:Quality Assurance Agent"
+
+def transfer_to_stakeholder_liaison():
+    """Transfer to the Stakeholder Liaison Agent."""
+    return "HANDOFF:Stakeholder Liaison Agent"
+
+def transfer_to_master():
+    """Transfer back to the Master Agent."""
+    return "HANDOFF:Master Agent"
+
+# Create a tools map
+tools_map = {
     "transfer_to_technical_requirements": transfer_to_technical_requirements,
     "transfer_to_ux": transfer_to_ux,
     "transfer_to_qa": transfer_to_qa,
@@ -85,46 +99,21 @@ config.tools = {
 # Create agents based on configuration
 agents = [
     Agent(
-        name="Master Agent",
-        instructions="You are the Master Agent responsible for coordinating the optimization of user stories. Your role is to analyze the initial user story, decide which specialist agents to involve, and synthesize their inputs into a final, optimized user story. Use your judgment to determine which agents are necessary for each story, and don't hesitate to involve multiple agents if needed. Your goal is to produce a comprehensive, well-rounded user story that covers technical, UX, and business aspects as appropriate. When synthesizing the final user story, ensure it follows the format 'As a user, I want... so that...' followed by a prioritized list of acceptance criteria.",
-        tools=[config.tools[tool] for tool in config.tools if tool.startswith("transfer_to_")],
-        model=config.openai_model
-    ),
-    Agent(
-        name="Technical Requirements Agent",
-        instructions="You are the Technical Requirements Agent. Your role is to analyze user stories from a technical perspective and break them down into specific technical requirements.",
-        tools=[config.tools["transfer_to_master"]],
-        model=config.openai_model
-    ),
-    Agent(
-        name="User Experience Agent",
-        instructions="You are the UX Agent. Your role is to optimize user stories by considering the user experience perspective. Focus on usability, accessibility, and user interface design considerations.",
-        tools=[config.tools["transfer_to_master"]],
-        model=config.openai_model
-    ),
-    Agent(
-        name="Quality Assurance Agent",
-        instructions="You are the QA Agent. Your role is to review and refine user stories to ensure they are testable and meet quality standards. Focus on defining acceptance criteria and potential edge cases.",
-        tools=[config.tools["transfer_to_master"]],
-        model=config.openai_model
-    ),
-    Agent(
-        name="Stakeholder Liaison Agent",
-        instructions="You are the Stakeholder Liaison Agent. Your role is to review the optimized user story and ensure it aligns with business goals and user needs. Provide specific business-related acceptance criteria and suggest any necessary adjustments to meet stakeholder expectations.",
-        tools=[config.tools["transfer_to_master"]],
+        name=agent_config.name,
+        instructions=agent_config.instructions,
+        tools=[tools_map[tool] for tool in agent_config.tools if tool in tools_map],
         model=config.openai_model
     )
+    for agent_config in config.agents
 ]
 
 # Create the swarm
 swarm = Swarm(agents)
 
-# Expose swarm creation function for testing
-def create_swarm():
-    return Swarm(agents)
-
 class UserStory(BaseModel):
     content: str
+    epic_context: Optional[str] = None
+    story_context: Optional[str] = None
 
 class OptimizedUserStory(BaseModel):
     original: str
@@ -139,32 +128,28 @@ class OptimizationStatus(BaseModel):
     status: str
 
 optimization_status = OptimizationStatus(total_stories=0, processed_stories=0, status="idle")
+stop_optimization = False
 
-# Check for API key
-if not os.getenv("OPENAI_API_KEY"):
-    logger.critical("OPENAI_API_KEY environment variable is not set")
-    raise ValueError("OPENAI_API_KEY environment variable is not set")
-
-def optimize_story_logic(content: str):
+def optimize_story_logic(content: str, epic_context: Optional[str] = None, story_context: Optional[str] = None):
     """
     Core logic for optimizing a user story.
     This function should be used by both API endpoints.
     """
     async def optimize():
-        print(f"Starting optimization for story: {content[:50]}...")
+        logger.info(f"Starting optimization for story: {content[:50] if isinstance(content, str) else 'None'}...")
         start_time = time.time()
         try:
             # Context Analysis Step
-            context_analysis = await swarm.analyze_context(content)
-            print(f"Context analysis: {context_analysis}")
+            context_analysis = await swarm.analyze_context(content, epic_context, story_context)
+            logger.info(f"Context analysis: {context_analysis[:100] if isinstance(context_analysis, str) else 'None'}...")
 
-            result = await swarm.process_message(content, config.tools, context_analysis)
+            result = await swarm.process_message(content, context_analysis)
             end_time = time.time()
-            print(f"Optimization completed in {end_time - start_time:.2f} seconds")
-            print(f"Optimized story: {result[0][:50]}...")
+            logger.info(f"Optimization completed in {end_time - start_time:.2f} seconds")
+            logger.info(f"Optimized story: {result.optimized[:50] if isinstance(result.optimized, str) else 'None'}...")
             return result
         except Exception as e:
-            print(f"Error during optimization: {str(e)}")
+            logger.error(f"Error during optimization: {str(e)}")
             raise
     return optimize
 
@@ -173,83 +158,99 @@ def optimize_story_logic(content: str):
 async def optimize_story(user_story: UserStory, request: Request):
     try:
         logger.info(f"Received request to optimize story: {user_story.content}")
-        optimize_func = optimize_story_logic(user_story.content)
-        optimized, agent_interactions, performance_metrics = await optimize_func()
-        logger.info(f"Optimized story: {optimized}")
-        logger.info(f"Performance metrics: {performance_metrics}")
-        
-        # Ensure agent_interactions include agent_name and decision
-        for interaction in agent_interactions:
-            if "role" in interaction and interaction["role"] == "assistant":
-                interaction["agent_name"] = interaction.get("agent_name", "Unknown Agent")
-                interaction["decision"] = interaction.get("decision", "No decision recorded")
-        
-        # Optionally adjust max_iterations or early_stopping_threshold based on performance_metrics
-        if performance_metrics["quality_score"] < 0.6 and swarm.max_iterations < 10:
-            swarm.update_max_iterations(swarm.max_iterations + 1)
-            logger.info(f"Increased max iterations to {swarm.max_iterations}")
-        elif performance_metrics["quality_score"] > 0.9 and swarm.max_iterations > 3:
-            swarm.update_max_iterations(swarm.max_iterations - 1)
-            logger.info(f"Decreased max iterations to {swarm.max_iterations}")
-        
-        # Log the final user story for easy access and integration
-        logger.info(f"Final User Story for Jira Integration:\n{optimized}")
+        optimize_func = optimize_story_logic(user_story.content, user_story.epic_context, user_story.story_context)
+        result = await optimize_func()
+        logger.info(f"Optimized story: {result.optimized}")
+        logger.info(f"Performance metrics: {result.performance_metrics}")
         
         return OptimizedUserStory(
             original=user_story.content,
-            optimized=optimized,
-            agent_interactions=agent_interactions,
+            optimized=result.optimized,
+            agent_interactions=result.agent_interactions,
             model=config.openai_model,
-            performance_metrics=performance_metrics
+            performance_metrics=result.performance_metrics
         )
     except Exception as e:
         logger.error(f"Error occurred while optimizing story: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"An error occurred while optimizing the story: {str(e)}")
 
-# Implement background processing for multiple user stories
-async def process_stories_background(stories: List[str], swarm: Swarm = swarm):
-    global optimization_status
-    optimization_status.total_stories = len(stories)
-    optimization_status.processed_stories = 0
-    optimization_status.status = "processing"
-    
-    print(f"Starting to process {len(stories)} stories")
-    start_time = time.time()
+@app.post("/optimize_jira_stories")
+@rate_limit("1/minute")
+async def optimize_jira_stories(background_tasks: BackgroundTasks, request: Request):
+    global stop_optimization
+    stop_optimization = False
 
-    for i, story in enumerate(stories, 1):
-        print(f"Processing story {i}/{len(stories)}")
-        optimize_func = optimize_story_logic(story)
+    async def process_jira_stories():
+        global optimization_status, stop_optimization
+        optimization_status.status = "processing"
+        
         try:
-            optimized, agent_interactions, performance_metrics = await optimize_func()
-            optimization_status.processed_stories += 1
-            elapsed_time = time.time() - start_time
-            print(f"Processed story {i}/{len(stories)} - Total stories: {optimization_status.processed_stories}/{optimization_status.total_stories}")
-            print(f"Time elapsed: {elapsed_time:.2f} seconds")
-            print(f"Average time per story: {elapsed_time / optimization_status.processed_stories:.2f} seconds")
+            epics = fetch_epics()
+            optimization_status.total_stories = sum(len(fetch_subtasks(epic['key'])) for epic in epics)
+            optimization_status.processed_stories = 0
             
-            print(f"Story {i}:")
-            print(f"  Original: {story[:50]}...")
-            print(f"  Optimized: {optimized[:50]}...")
-            print(f"  Agents involved: {', '.join(interaction['agent_name'] for interaction in agent_interactions if 'agent_name' in interaction)}")
-            print(f"  Quality score: {performance_metrics['quality_score']:.2f}")
+            logger.info(f"Starting optimization of {optimization_status.total_stories} Jira stories")
+            
+            for epic in epics:
+                if stop_optimization:
+                    logger.info("Optimization process stopped by user")
+                    break
+
+                epic_key = epic['key']
+                epic_description = epic['fields'].get('description', '')
+                logger.info(f"Processing epic: {epic_key} - {epic['fields'].get('summary', 'No summary')}")
+                
+                stories = fetch_stories(epic_key)
+                
+                for story in stories:
+                    if stop_optimization:
+                        logger.info("Optimization process stopped by user")
+                        break
+
+                    story_key = story['key']
+                    story_description = story['fields'].get('description', '')
+                    logger.info(f"Processing story: {story_key} - {story['fields'].get('summary', 'No summary')}")
+                    
+                    subtasks = fetch_subtasks(story_key)
+                    
+                    for subtask in subtasks:
+                        if stop_optimization:
+                            logger.info("Optimization process stopped by user")
+                            break
+
+                        subtask_key = subtask['key']
+                        subtask_description = subtask['fields'].get('description', '')
+                        
+                        logger.info(f"Optimizing subtask: {subtask_key} - {subtask['fields'].get('summary', 'No summary')}")
+                        
+                        optimize_func = optimize_story_logic(subtask_description, epic_description, story_description)
+                        result = await optimize_func()
+                        
+                        update_subtask(subtask_key, result.optimized)
+                        
+                        optimization_status.processed_stories += 1
+                        logger.info(f"Processed {optimization_status.processed_stories}/{optimization_status.total_stories} subtasks")
+            
+            if not stop_optimization:
+                optimization_status.status = "completed"
+                logger.info("Jira story optimization completed")
+            else:
+                optimization_status.status = "stopped"
+        except JiraIntegrationError as e:
+            logger.error(f"Jira integration error: {str(e)}")
+            optimization_status.status = "failed"
         except Exception as e:
-            print(f"Error processing story {i}: {str(e)}")
+            logger.error(f"Unexpected error during Jira story optimization: {str(e)}", exc_info=True)
+            optimization_status.status = "failed"
 
-    optimization_status.status = "completed"
-    total_time = time.time() - start_time
-    print(f"All stories processed in {total_time:.2f} seconds")
-    print(f"Final average time per story: {total_time / len(stories):.2f} seconds")
+    background_tasks.add_task(process_jira_stories)
+    return {"message": "Jira story optimization started in the background"}
 
-@app.post("/process_all_stories")
-@rate_limit("2/minute")
-async def process_stories(background_tasks: BackgroundTasks, stories: List[str], request: Request):
-    if optimization_status.status == "processing":
-        logger.warning("Attempted to start optimization while another is in progress")
-        raise HTTPException(status_code=400, detail="Optimization already in progress")
-    
-    logger.info(f"Starting background processing of {len(stories)} stories")
-    background_tasks.add_task(process_stories_background, stories)
-    return {"message": "Story optimization started in the background"}
+@app.post("/stop_optimization")
+async def stop_optimization_process():
+    global stop_optimization
+    stop_optimization = True
+    return {"message": "Optimization process stop signal sent"}
 
 @app.get("/optimization_status", response_model=OptimizationStatus)
 async def get_optimization_status():

@@ -9,41 +9,39 @@ class AgentConfig(BaseModel):
 class Config(BaseModel):
     openai_model: str = "gpt-4o"
     agents: List[AgentConfig]
-    tools: dict[str, Callable]
+    tools: dict[str, Callable] = {}
 
 # Default configuration
 default_config = Config(
     agents=[
         AgentConfig(
+            name="Master Agent",
+            instructions="You are the Master Agent responsible for coordinating the optimization of user stories. Your role is to analyze the initial user story, decide which specialist agents to involve, and synthesize their inputs into a final, optimized user story. Use your judgment to determine which agents are necessary for each story, and don't hesitate to involve multiple agents if needed. Your goal is to produce a comprehensive, well-rounded user story that covers technical, UX, and business aspects as appropriate. When synthesizing the final user story, ensure it follows the format 'As a user, I want... so that...' followed by a prioritized list of acceptance criteria.",
+            tools=["transfer_to_technical_requirements", "transfer_to_ux", "transfer_to_qa", "transfer_to_stakeholder_liaison", "look_up_item", "execute_refund"]
+        ),
+        AgentConfig(
             name="Technical Requirements Agent",
-            instructions="You are a Technical Analyst. Focus on the technical feasibility and requirements of each user story.",
+            instructions="You are the Technical Requirements Agent. Your role is to analyze user stories from a technical perspective and break them down into specific technical requirements.",
             tools=["look_up_item", "transfer_to_ux", "transfer_to_qa", "transfer_to_stakeholder_liaison", "transfer_to_master"]
         ),
         AgentConfig(
             name="User Experience Agent",
-            instructions="You are a UX Designer. Ensure user stories reflect end-user needs and usability standards.",
+            instructions="You are the UX Agent. Your role is to optimize user stories by considering the user experience perspective. Focus on usability, accessibility, and user interface design considerations.",
             tools=["transfer_to_technical_requirements", "transfer_to_qa", "transfer_to_stakeholder_liaison", "transfer_to_master"]
         ),
         AgentConfig(
             name="Quality Assurance Agent",
-            instructions="You are a QA Specialist. Focus on making user stories testable and ensuring clarity for QA.",
+            instructions="You are the QA Agent. Your role is to review and refine user stories to ensure they are testable and meet quality standards. Focus on defining acceptance criteria and potential edge cases.",
             tools=["transfer_to_technical_requirements", "transfer_to_ux", "transfer_to_stakeholder_liaison", "transfer_to_master"]
         ),
         AgentConfig(
             name="Stakeholder Liaison Agent",
-            instructions="You are a Stakeholder Representative. Ensure alignment with business priorities and capture input from stakeholders.",
+            instructions="You are the Stakeholder Liaison Agent. Your role is to review the optimized user story and ensure it aligns with business goals and user needs. Provide specific business-related acceptance criteria and suggest any necessary adjustments to meet stakeholder expectations.",
             tools=["execute_refund", "transfer_to_technical_requirements", "transfer_to_ux", "transfer_to_qa", "transfer_to_master"]
-        ),
-        AgentConfig(
-            name="Master Agent",
-            instructions="You are a Lead Business Analyst. Your role is to oversee and guide the improvement of user stories.",
-            tools=["transfer_to_technical_requirements", "transfer_to_ux", "transfer_to_qa", "transfer_to_stakeholder_liaison"]
         )
-    ],
-    tools={}  # This will be populated in main.py
+    ]
 )
 
-# Function to load custom configuration
 def load_config(config_path: str) -> Config:
     # Implement loading from a file (e.g., JSON or YAML)
     # For now, we'll just return the default config

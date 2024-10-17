@@ -33,16 +33,16 @@ async def run_function_evals(
             
             logger.debug("Calling optimize_story_logic function")
             optimize_func = optimize_story_logic(user_story.content)
-            optimized, agent_interactions, performance_metrics = await optimize_func()
+            response = await optimize_func()
             
-            logger.debug(f"Optimized story result: {optimized}")
+            logger.debug(f"Optimized story result: {response.optimized}")
             
             result = {
                 "original": user_message,
-                "optimized": optimized,
-                "agent_interactions": agent_interactions,
-                "performance_metrics": performance_metrics,
-                "improvement_score": performance_metrics.get("quality_score", 0)
+                "optimized": response.optimized,
+                "agent_interactions": response.agent_interactions,
+                "performance_metrics": response.performance_metrics,
+                "improvement_score": response.performance_metrics.get("quality_score", 0)
             }
         except Exception as e:
             logger.error(f"Error processing case: {e}")
