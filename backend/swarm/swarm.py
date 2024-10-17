@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Tuple, Optional
+from typing import List, Dict, Any, Tuple
 from .agent import Agent
 import json
 import asyncio
@@ -23,21 +23,29 @@ class Swarm:
         self.max_iterations = 5  # Default value, can be adjusted
         self.early_stopping_threshold = 0.8  # Quality threshold for early stopping
 
-    async def process_message(self, message: str, tools_map: Dict) -> Tuple[str, List[Dict], Dict[str, Any]]:
+    async def analyze_context(self, message: str) -> str:
+        context_prompt = f"Analyze the following user story and provide a brief summary of its main intent, focusing on the specific task or goal the user wants to achieve. Avoid introducing additional processes or requirements not explicitly mentioned:\n\n{message}"
+        context_response = self.master_agent.get_completion([{"role": "user", "content": context_prompt}], [])
+        return context_response.choices[0].message.content
+
+    async def process_message(self, message: str, tools_map: Dict, context_analysis: str) -> Tuple[str, List[Dict], Dict[str, Any]]:
         start_time = time.time()
         messages = [{"role": "user", "content": message}]
         agent_interactions = []
         final_response = ""
         
+        # Add context analysis to messages
+        messages.append({"role": "system", "content": f"Context Analysis: {context_analysis}"})
+        
         # Consult all agents
-        for agent_name in ["Master Agent", "Technical Requirements Agent", "User Experience Agent", "Quality Assurance Agent", "Stakeholder Liaison Agent"]:
+        for agent_name in ["Technical Requirements Agent", "User Experience Agent", "Quality Assurance Agent", "Stakeholder Liaison Agent"]:
             agent = self.agents[agent_name]
-            response = await self.run_agent(agent, messages + [{"role": "user", "content": f"As the {agent_name}, please provide your specific input for optimizing this user story."}], tools_map)
+            response = await self.run_agent(agent, messages + [{"role": "user", "content": f"As the {agent_name}, please provide your specific input for optimizing this user story, focusing only on aspects directly related to the main intent: {context_analysis}"}], tools_map)
             agent_interactions.extend(response.messages)
             messages.extend(response.messages)
 
         # Generate final summary
-        final_response = await self.generate_final_summary(messages)
+        final_response = self.generate_final_summary(messages, context_analysis)
 
         end_time = time.time()
         execution_time = end_time - start_time
@@ -136,8 +144,33 @@ class Swarm:
         
         return min(score, 1.0)
 
-    async def generate_final_summary(self, messages: List[Dict[str, str]]) -> str:
-        summary_message = [{"role": "user", "content": "As the Master Agent, synthesize all the information provided into a final, optimized user story. Start with 'As a user, I want... so that...'. Then, provide a comprehensive list of acceptance criteria that cover technical, UX, business, and quality assurance aspects. Ensure the final output is cohesive, incorporates insights from all agents, and addresses key points raised by each specialist. This is the final output, so make it complete and ready for implementation."}]
+    def generate_final_summary(self, messages: List[Dict[str, str]], context_analysis: str) -> str:
+        summary_prompt = f"""
+        Based on the context analysis: '{context_analysis}' and all the information provided, create a comprehensive and optimized user story. Follow these guidelines:
+
+        1. Start with 'As a user, I want... so that...'. Ensure this reflects the main intent of the original user story.
+        2. Improve the content based on your analysis of which insights from all agents (Technical, UX, QA, and Stakeholder Liaison) to take into account
+        3. Provide a focused list of acceptance criteria that directly relate to the main intent of the user story.
+        4. Ensure each acceptance criterion is specific, measurable, and relevant to the user story.
+        5. Do not repeat the user story in the acceptance criteria.
+        6. Address key points raised by each specialist while staying true to the original context.
+        7. Avoid introducing unrelated processes or requirements.
+        8. Do not add unnecessary phrases like 'so that I can complete my task efficiently'.
+        9. Ensure the final output is cohesive and well-structured.
+
+        Format the output as follows:
+        As a user, I want [improved action] so that [improved outcome].
+
+        Acceptance Criteria:
+        1. [Specific criterion 1]
+        2. [Specific criterion 2]
+        3. [Specific criterion 3]
+        ...
+
+        Ensure at least 3-5 acceptance criteria are provided, covering different aspects of the user story.
+        """
+
+        summary_message = [{"role": "user", "content": summary_prompt}]
         
         max_attempts = 5
         for attempt in range(max_attempts):
@@ -148,19 +181,33 @@ class Swarm:
                 
                 logger.info(f"Generated response: {final_response[:100]}...")  # Log the first 100 characters
                 
-                if final_response.startswith("As a user, I want") and "Acceptance Criteria:" in final_response:
+                if self.validate_final_response(final_response):
                     logger.info(f"Successfully generated user story on attempt {attempt + 1}")
                     return final_response
                 else:
                     logger.warning(f"Attempt {attempt + 1} failed to generate proper user story format")
-                    messages.append({"role": "user", "content": "The previous response was not in the correct format. Please try again to synthesize the information into a proper user story format, starting with 'As a user, I want...', followed by comprehensive acceptance criteria. Ensure you address technical, UX, business, and quality assurance aspects."})
+                    messages.append({"role": "user", "content": "The previous response did not meet the required format and quality standards. Please try again, ensuring you follow all the guidelines provided."})
             except Exception as e:
                 logger.error(f"Error in generate_final_summary attempt {attempt + 1}: {str(e)}")
         
         # If we still don't have a proper user story, return a basic one based on the original message
         logger.error("Failed to generate a proper user story after multiple attempts. Returning a basic user story.")
         original_message = messages[0]['content']
-        return f"As a user, I want {original_message} so that I can complete my task efficiently.\n\nAcceptance Criteria:\n1. The system should allow me to {original_message}.\n2. The process should be user-friendly and intuitive.\n3. The system should provide feedback on the success or failure of the action."
+        return f"As a user, I want {original_message} so that I can complete my task effectively.\n\nAcceptance Criteria:\n1. The system should provide a clear interface for the user action.\n2. The process should be efficient and user-friendly.\n3. The system should provide clear feedback on the success or failure of the action."
+
+    def validate_final_response(self, response: str) -> bool:
+        if not response.startswith("As a user, I want"):
+            return False
+        if "so that" not in response:
+            return False
+        if "Acceptance Criteria:" not in response:
+            return False
+        criteria = response.split("Acceptance Criteria:")[1].strip().split("\n")
+        if len(criteria) < 3:
+            return False
+        if any(criterion.strip().startswith("The system should allow me to As a user,") for criterion in criteria):
+            return False
+        return True
 
     def update_max_iterations(self, new_max_iterations: int):
         self.max_iterations = new_max_iterations

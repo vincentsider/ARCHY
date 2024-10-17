@@ -6,6 +6,8 @@ from typing import List, Optional, Dict, Any
 import sys
 import os
 from dotenv import load_dotenv
+import asyncio
+import time
 
 # Load environment variables from the correct location
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
@@ -117,6 +119,10 @@ agents = [
 # Create the swarm
 swarm = Swarm(agents)
 
+# Expose swarm creation function for testing
+def create_swarm():
+    return Swarm(agents)
+
 class UserStory(BaseModel):
     content: str
 
@@ -139,13 +145,27 @@ if not os.getenv("OPENAI_API_KEY"):
     logger.critical("OPENAI_API_KEY environment variable is not set")
     raise ValueError("OPENAI_API_KEY environment variable is not set")
 
-@lru_cache(maxsize=100)
-def optimize_story_cached(content: str):
+def optimize_story_logic(content: str):
     """
-    Cached version of story optimization to avoid redundant API calls.
+    Core logic for optimizing a user story.
+    This function should be used by both API endpoints.
     """
     async def optimize():
-        return await swarm.process_message(content, config.tools)
+        print(f"Starting optimization for story: {content[:50]}...")
+        start_time = time.time()
+        try:
+            # Context Analysis Step
+            context_analysis = await swarm.analyze_context(content)
+            print(f"Context analysis: {context_analysis}")
+
+            result = await swarm.process_message(content, config.tools, context_analysis)
+            end_time = time.time()
+            print(f"Optimization completed in {end_time - start_time:.2f} seconds")
+            print(f"Optimized story: {result[0][:50]}...")
+            return result
+        except Exception as e:
+            print(f"Error during optimization: {str(e)}")
+            raise
     return optimize
 
 @app.post("/optimize_story", response_model=OptimizedUserStory)
@@ -153,7 +173,8 @@ def optimize_story_cached(content: str):
 async def optimize_story(user_story: UserStory, request: Request):
     try:
         logger.info(f"Received request to optimize story: {user_story.content}")
-        optimized, agent_interactions, performance_metrics = await optimize_story_cached(user_story.content)()
+        optimize_func = optimize_story_logic(user_story.content)
+        optimized, agent_interactions, performance_metrics = await optimize_func()
         logger.info(f"Optimized story: {optimized}")
         logger.info(f"Performance metrics: {performance_metrics}")
         
@@ -186,22 +207,38 @@ async def optimize_story(user_story: UserStory, request: Request):
         raise HTTPException(status_code=500, detail=f"An error occurred while optimizing the story: {str(e)}")
 
 # Implement background processing for multiple user stories
-async def process_stories_background(stories: List[str]):
+async def process_stories_background(stories: List[str], swarm: Swarm = swarm):
     global optimization_status
     optimization_status.total_stories = len(stories)
     optimization_status.processed_stories = 0
     optimization_status.status = "processing"
+    
+    print(f"Starting to process {len(stories)} stories")
+    start_time = time.time()
 
-    for story in stories:
+    for i, story in enumerate(stories, 1):
+        print(f"Processing story {i}/{len(stories)}")
+        optimize_func = optimize_story_logic(story)
         try:
-            await optimize_story_cached(story)()
+            optimized, agent_interactions, performance_metrics = await optimize_func()
             optimization_status.processed_stories += 1
-            logger.info(f"Processed story {optimization_status.processed_stories}/{optimization_status.total_stories}")
+            elapsed_time = time.time() - start_time
+            print(f"Processed story {i}/{len(stories)} - Total stories: {optimization_status.processed_stories}/{optimization_status.total_stories}")
+            print(f"Time elapsed: {elapsed_time:.2f} seconds")
+            print(f"Average time per story: {elapsed_time / optimization_status.processed_stories:.2f} seconds")
+            
+            print(f"Story {i}:")
+            print(f"  Original: {story[:50]}...")
+            print(f"  Optimized: {optimized[:50]}...")
+            print(f"  Agents involved: {', '.join(interaction['agent_name'] for interaction in agent_interactions if 'agent_name' in interaction)}")
+            print(f"  Quality score: {performance_metrics['quality_score']:.2f}")
         except Exception as e:
-            logger.error(f"Error processing story: {str(e)}", exc_info=True)
+            print(f"Error processing story {i}: {str(e)}")
 
     optimization_status.status = "completed"
-    logger.info("All stories processed")
+    total_time = time.time() - start_time
+    print(f"All stories processed in {total_time:.2f} seconds")
+    print(f"Final average time per story: {total_time / len(stories):.2f} seconds")
 
 @app.post("/process_all_stories")
 @rate_limit("2/minute")
