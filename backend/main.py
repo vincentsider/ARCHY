@@ -19,6 +19,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from backend.config import Config, load_config
 from backend.swarm.agent import Agent
 from backend.swarm.swarm import Swarm
+from backend.jira_integration import process_jira_subtasks  # Import the Jira integration function
 import logging
 import json
 from functools import lru_cache, wraps
@@ -78,11 +79,11 @@ agents = [
 ]
 
 # Create the swarm
-swarm = Swarm(agents)
+swarm = Swarm(agents, config)
 
 # Expose swarm creation function for testing
 def create_swarm():
-    return Swarm(agents)
+    return Swarm(agents, config)
 
 class UserStory(BaseModel):
     content: str
@@ -106,36 +107,37 @@ if not os.getenv("OPENAI_API_KEY"):
     logger.critical("OPENAI_API_KEY environment variable is not set")
     raise ValueError("OPENAI_API_KEY environment variable is not set")
 
-def optimize_story_logic(content: str):
+async def optimize_story_logic(content: str):
     """
     Core logic for optimizing a user story.
     This function should be used by both API endpoints.
     """
-    async def optimize():
-        print(f"Starting optimization for story: {content[:50]}...")
-        start_time = time.time()
-        try:
-            # Context Analysis Step
-            context_analysis = await swarm.analyze_context(content)
-            print(f"Context analysis: {context_analysis}")
+    print(f"Starting optimization for story: {content[:50]}...")
+    start_time = time.time()
+    try:
+        # Context Analysis Step
+        context_analysis = await swarm.analyze_context(content)
+        print(f"Context analysis: {context_analysis}")
 
-            result = await swarm.process_message(content, config.tools, context_analysis)
-            end_time = time.time()
-            print(f"Optimization completed in {end_time - start_time:.2f} seconds")
-            print(f"Optimized story: {result[0][:50]}...")
-            return result
-        except Exception as e:
-            print(f"Error during optimization: {str(e)}")
-            raise
-    return optimize
+        # Triage Step
+        relevant_agents = await swarm.triage_user_story(content, context_analysis)
+        print(f"Relevant agents: {', '.join(relevant_agents)}")
+
+        result = await swarm.process_message(content, config.tools, context_analysis)
+        end_time = time.time()
+        print(f"Optimization completed in {end_time - start_time:.2f} seconds")
+        print(f"Optimized story: {result[0][:50]}...")
+        return result
+    except Exception as e:
+        print(f"Error during optimization: {str(e)}")
+        raise
 
 @app.post("/optimize_story", response_model=OptimizedUserStory)
 @rate_limit("5/minute")
 async def optimize_story(user_story: UserStory, request: Request):
     try:
         logger.info(f"Received request to optimize story: {user_story.content}")
-        optimize_func = optimize_story_logic(user_story.content)
-        optimized, agent_interactions, performance_metrics = await optimize_func()
+        optimized, agent_interactions, performance_metrics = await optimize_story_logic(user_story.content)
         logger.info(f"Optimized story: {optimized}")
         logger.info(f"Performance metrics: {performance_metrics}")
         
@@ -179,9 +181,8 @@ async def process_stories_background(stories: List[str], swarm: Swarm = swarm):
 
     for i, story in enumerate(stories, 1):
         print(f"Processing story {i}/{len(stories)}")
-        optimize_func = optimize_story_logic(story)
         try:
-            optimized, agent_interactions, performance_metrics = await optimize_func()
+            optimized, agent_interactions, performance_metrics = await optimize_story_logic(story)
             optimization_status.processed_stories += 1
             elapsed_time = time.time() - start_time
             print(f"Processed story {i}/{len(stories)} - Total stories: {optimization_status.processed_stories}/{optimization_status.total_stories}")
@@ -216,6 +217,18 @@ async def process_stories(background_tasks: BackgroundTasks, stories: List[str],
 async def get_optimization_status():
     logger.info(f"Current optimization status: {optimization_status}")
     return optimization_status
+
+# New endpoint for processing Jira Sub-tasks
+@app.post("/process_jira_subtasks")
+@rate_limit("1/minute")
+async def process_jira_subtasks_endpoint(background_tasks: BackgroundTasks, request: Request):
+    if optimization_status.status == "processing":
+        logger.warning("Attempted to start Jira optimization while another process is in progress")
+        raise HTTPException(status_code=400, detail="Optimization already in progress")
+    
+    logger.info("Starting background processing of Jira Sub-tasks")
+    background_tasks.add_task(process_jira_subtasks, optimize_story_logic)
+    return {"message": "Jira Sub-task optimization started in the background"}
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
