@@ -19,6 +19,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from backend.config import Config, load_config
 from backend.swarm.agent import Agent
 from backend.swarm.swarm import Swarm
+from backend.jira_integration import process_jira_subtasks  # Import the Jira integration function
 import logging
 import json
 from functools import lru_cache, wraps
@@ -216,6 +217,18 @@ async def process_stories(background_tasks: BackgroundTasks, stories: List[str],
 async def get_optimization_status():
     logger.info(f"Current optimization status: {optimization_status}")
     return optimization_status
+
+# New endpoint for processing Jira Sub-tasks
+@app.post("/process_jira_subtasks")
+@rate_limit("1/minute")
+async def process_jira_subtasks_endpoint(background_tasks: BackgroundTasks, request: Request):
+    if optimization_status.status == "processing":
+        logger.warning("Attempted to start Jira optimization while another process is in progress")
+        raise HTTPException(status_code=400, detail="Optimization already in progress")
+    
+    logger.info("Starting background processing of Jira Sub-tasks")
+    background_tasks.add_task(process_jira_subtasks, optimize_story_logic)
+    return {"message": "Jira Sub-task optimization started in the background"}
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
