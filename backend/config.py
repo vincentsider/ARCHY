@@ -15,6 +15,8 @@ class Config(BaseModel):
     openai_model: str = "gpt-4o"
     agents: List[AgentConfig]
     tools: dict[str, Callable]
+    max_clarification_rounds: int = 3
+    quality_threshold: float = 0.8
 
 # Default configuration
 default_config = Config(
@@ -53,7 +55,9 @@ default_config = Config(
         "transfer_to_qa": transfer_to_qa,
         "transfer_to_stakeholder_liaison": transfer_to_stakeholder_liaison,
         "transfer_to_master": transfer_to_master,
-    }
+    },
+    max_clarification_rounds=3,
+    quality_threshold=0.8
 )
 
 # Function to load custom configuration

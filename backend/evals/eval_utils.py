@@ -32,8 +32,7 @@ async def run_function_evals(
             user_story = UserStory(content=user_message)
             
             logger.debug("Calling optimize_story_logic function")
-            optimize_func = optimize_story_logic(user_story.content)
-            optimized, agent_interactions, performance_metrics = await optimize_func()
+            optimized, agent_interactions, performance_metrics = await optimize_story_logic(user_story.content)
             
             logger.debug(f"Optimized story result: {optimized}")
             
