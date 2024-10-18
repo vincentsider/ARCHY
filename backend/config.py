@@ -3,7 +3,8 @@ from pydantic import BaseModel
 from backend.swarm.tools import (
     look_up_item, execute_refund,
     transfer_to_technical_requirements, transfer_to_ux,
-    transfer_to_qa, transfer_to_stakeholder_liaison, transfer_to_master
+    transfer_to_qa, transfer_to_stakeholder_liaison, transfer_to_master,
+    transfer_to_pega_specialist
 )
 
 class AgentConfig(BaseModel):
@@ -23,8 +24,8 @@ default_config = Config(
     agents=[
         AgentConfig(
             name="Master Agent",
-            instructions="You are the Master Agent responsible for coordinating the optimization of user stories. Your role is to analyze the initial user story, decide which specialist agents to involve, and synthesize their inputs into a final, optimized user story. Use your judgment to determine which agents are necessary for each story, and don't hesitate to involve multiple agents if needed. Your goal is to produce a comprehensive, well-rounded user story that covers technical, UX, and business aspects as appropriate. When synthesizing the final user story, ensure it follows the format 'As a user, I want... so that...' followed by a prioritized list of acceptance criteria.",
-            tools=["transfer_to_technical_requirements", "transfer_to_ux", "transfer_to_qa", "transfer_to_stakeholder_liaison"]
+            instructions="You are the Master Agent responsible for coordinating the optimization of user stories. Your role is to analyze the initial user story, decide which specialist agents to involve, and synthesize their inputs into a final, optimized user story. Use your judgment to determine which agents are necessary for each story, and don't hesitate to involve multiple agents if needed. Your goal is to produce a comprehensive, well-rounded user story that covers technical, UX, business aspects, and Pega-specific considerations as appropriate. When synthesizing the final user story, ensure it follows the format 'As a user, I want... so that...' followed by a prioritized list of acceptance criteria.",
+            tools=["transfer_to_technical_requirements", "transfer_to_ux", "transfer_to_qa", "transfer_to_stakeholder_liaison", "transfer_to_pega_specialist"]
         ),
         AgentConfig(
             name="Technical Requirements Agent",
@@ -45,6 +46,11 @@ default_config = Config(
             name="Stakeholder Liaison Agent",
             instructions="You are the Stakeholder Liaison Agent. Your role is to review the optimized user story and ensure it aligns with business goals and user needs. Provide specific business-related acceptance criteria and suggest any necessary adjustments to meet stakeholder expectations. Ensure alignment with business priorities and capture input from stakeholders.",
             tools=["execute_refund", "transfer_to_master"]
+        ),
+        AgentConfig(
+            name="Pega Specialist",
+            instructions="You are the Pega Specialist (Senior Lead System Architect). Your role is to provide expert input on implementing user stories in the Pega platform. Focus on Pega-specific considerations, best practices, and architectural decisions. Ensure that user stories are optimized for efficient implementation in Pega, considering features like case management, decision management, and UI design capabilities specific to Pega.",
+            tools=["transfer_to_master"]
         )
     ],
     tools={
@@ -55,6 +61,7 @@ default_config = Config(
         "transfer_to_qa": transfer_to_qa,
         "transfer_to_stakeholder_liaison": transfer_to_stakeholder_liaison,
         "transfer_to_master": transfer_to_master,
+        "transfer_to_pega_specialist": transfer_to_pega_specialist,
     },
     max_clarification_rounds=3,
     quality_threshold=0.8
