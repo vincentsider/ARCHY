@@ -49,8 +49,8 @@ default_config = Config(
         ),
         AgentConfig(
             name="Pega Specialist",
-            instructions="You are the Pega Specialist (Senior Lead System Architect). Your role is to provide expert input on implementing user stories in the Pega platform. Focus on Pega-specific considerations, best practices, and architectural decisions. Ensure that user stories are optimized for efficient implementation in Pega, considering features like case management, decision management, and UI design capabilities specific to Pega.",
-            tools=["transfer_to_master"]
+            instructions="You are the Pega Specialist (Senior Lead System Architect). Your role is to provide expert input on implementing user stories in the Pega platform. Focus on Pega-specific considerations, best practices, and architectural decisions. Ensure that user stories are optimized for efficient implementation in Pega, considering features like case management, decision management, and UI design capabilities specific to Pega. If you need input from other specialists, use the appropriate handoff tool (e.g., transfer_to_technical_requirements). After consulting, you will receive the response and can continue your analysis.",
+            tools=["transfer_to_master", "transfer_to_technical_requirements", "transfer_to_ux", "transfer_to_qa", "transfer_to_stakeholder_liaison"]
         )
     ],
     tools={
