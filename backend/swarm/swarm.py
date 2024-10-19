@@ -24,6 +24,7 @@ class Swarm:
         self.max_iterations = 5  # Default value, can be adjusted
         self.early_stopping_threshold = 0.8  # Quality threshold for early stopping
         self.config = config
+        self.confidence_threshold = 0.8  # New: Confidence threshold for specialists
         logger.info(f"Swarm initialized with {len(agents)} agents")
 
     async def analyze_context(self, message: str) -> str:
@@ -132,9 +133,14 @@ class Swarm:
                 })
                 logger.info(f"Swarm Workflow: {agent.name} response: {message.content[:100]}...")
 
-                # Add reasoning for not consulting other agents
-                if not message.tool_calls:
-                    logger.info(f"Swarm Workflow: {agent.name} decided not to consult other agents. Reasoning: The agent found sufficient information to proceed without additional input.")
+                # New: Check confidence and consult other agents if needed
+                confidence_score = self.assess_confidence(message.content)
+                if confidence_score < self.confidence_threshold:
+                    logger.info(f"Swarm Workflow: {agent.name} confidence below threshold. Score: {confidence_score:.2f}")
+                    consultation_result = await self.consult_other_agents(agent, message.content, tools_map)
+                    new_messages.extend(consultation_result)
+                else:
+                    logger.info(f"Swarm Workflow: {agent.name} decided not to consult other agents. Confidence score: {confidence_score:.2f}")
 
             if message.tool_calls:
                 for tool_call in message.tool_calls:
@@ -384,3 +390,55 @@ class Swarm:
 
     def get_max_iterations(self) -> int:
         return self.max_iterations
+
+    # New: Method to assess confidence of an agent's response
+    def assess_confidence(self, response: str) -> float:
+        # This is a placeholder implementation. In a real-world scenario,
+        # you would implement a more sophisticated confidence assessment.
+        words = response.split()
+        confidence = min(len(words) / 100, 1.0)  # Simple heuristic based on response length
+        return confidence
+
+    # New: Method to consult other agents when confidence is low
+    async def consult_other_agents(self, requesting_agent: Agent, response: str, tools_map: Dict) -> List[Dict[str, Any]]:
+        logger.info(f"Swarm Workflow: {requesting_agent.name} is consulting other agents due to low confidence")
+        consultation_results = []
+        
+        for agent_name, agent in self.agents.items():
+            if agent_name != requesting_agent.name and agent_name != "Master Agent":
+                logger.info(f"Swarm Workflow: Consulting {agent_name} for additional input")
+                consultation_prompt = f"As {agent_name}, please provide your perspective on the following response from {requesting_agent.name}:\n\n{response}\n\nFocus on aspects related to your expertise that might improve or complement this response."
+                
+                consultation_response = await self.run_agent(agent, [{"role": "user", "content": consultation_prompt}], tools_map)
+                consultation_results.extend(consultation_response.messages)
+                
+                logger.info(f"Swarm Workflow: Received input from {agent_name}")
+        
+        return consultation_results
+
+    # New: Method for Master Agent to request additional input
+    async def request_additional_input(self, response: str, tools_map: Dict) -> List[Dict[str, Any]]:
+        logger.info("Swarm Workflow: Master Agent is requesting additional input from specialists")
+        additional_input_results = []
+        
+        assessment_prompt = f"Analyze the following response and identify any areas that need more detailed input from specialists:\n\n{response}\n\nFor each area needing more input, specify which specialist (Technical Requirements, User Experience, Quality Assurance, Stakeholder Liaison, or Pega Specialist) should provide additional information."
+        
+        assessment_response = await self.master_agent.get_completion([{"role": "user", "content": assessment_prompt}], [])
+        areas_needing_input = assessment_response.choices[0].message.content.split("\n")
+        
+        for area in areas_needing_input:
+            if ":" in area:
+                specialist, topic = area.split(":", 1)
+                specialist = specialist.strip()
+                topic = topic.strip()
+                
+                if specialist in self.agents:
+                    logger.info(f"Swarm Workflow: Requesting additional input from {specialist} on: {topic}")
+                    input_prompt = f"As the {specialist}, please provide more detailed input on the following aspect of the user story:\n\n{topic}"
+                    
+                    input_response = await self.run_agent(self.agents[specialist], [{"role": "user", "content": input_prompt}], tools_map)
+                    additional_input_results.extend(input_response.messages)
+                    
+                    logger.info(f"Swarm Workflow: Received additional input from {specialist}")
+        
+        return additional_input_results
