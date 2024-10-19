@@ -5,6 +5,7 @@ import asyncio
 import time
 import logging
 import re
+from collections import Counter
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ class Swarm:
         self.max_iterations = 5  # Default value, can be adjusted
         self.early_stopping_threshold = 0.8  # Quality threshold for early stopping
         self.config = config
-        self.confidence_threshold = 0.8  # New: Confidence threshold for specialists
+        self.confidence_threshold = 0.7  # Adjusted from 0.9 to 0.7
         logger.info(f"Swarm initialized with {len(agents)} agents")
 
     async def analyze_context(self, message: str) -> str:
@@ -113,7 +114,23 @@ class Swarm:
 
     async def run_agent(self, agent: Agent, messages: List[Dict[str, str]], tools_map: Dict) -> Response:
         logger.info(f"Swarm Workflow: Running agent: {agent.name}")
-        tool_schemas = [agent.function_to_schema(tool) for tool in agent.tools]
+        
+        # Create tool_schemas only for the tools that the agent has access to
+        tool_schemas = [
+            {
+                "type": "function",
+                "function": {
+                    "name": tool_name,
+                    "description": tools_map[tool_name].__doc__ or "",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
+            }
+            for tool_name in agent.tools if tool_name in tools_map
+        ]
         
         try:
             response = await agent.get_completion(messages, tool_schemas)
@@ -133,7 +150,7 @@ class Swarm:
                 })
                 logger.info(f"Swarm Workflow: {agent.name} response: {message.content[:100]}...")
 
-                # New: Check confidence and consult other agents if needed
+                # Check confidence and consult other agents if needed
                 confidence_score = self.assess_confidence(message.content)
                 if confidence_score < self.confidence_threshold:
                     logger.info(f"Swarm Workflow: {agent.name} confidence below threshold. Score: {confidence_score:.2f}")
@@ -205,9 +222,18 @@ class Swarm:
         logger.info(f"Swarm Workflow: {agent_name} executing tool: {name}({args})")
 
         try:
-            result = tools_map[name](**args)
-            if asyncio.iscoroutine(result):
-                result = await result
+            if name not in tools_map:
+                raise ValueError(f"Tool '{name}' not found in tools_map")
+
+            tool = tools_map[name]
+            if callable(tool):
+                result = tool(**args)
+                if asyncio.iscoroutine(result):
+                    result = await result
+            else:
+                # If the tool is not callable (e.g., a string), return it directly
+                result = tool
+
             logger.info(f"Swarm Workflow: Tool execution completed: {name}")
             return result
         except Exception as e:
@@ -253,38 +279,30 @@ class Swarm:
             logger.error(f"Error in request_clarification from {agent.name}: {str(e)}")
             raise
 
-    def assess_quality(self, final_response: str) -> float:
-        logger.info("Swarm Workflow: Assessing quality of final response")
-        score = 0.0
+    def assess_confidence(self, response: str) -> float:
+        words = response.split()
+        word_count = len(words)
         
-        # Check for correct format
-        if final_response.startswith("As a user, I want"):
-            score += 0.2
-        if "so that" in final_response:
-            score += 0.2
-        if "Acceptance Criteria:" in final_response:
-            score += 0.2
+        # Check for key phrases that indicate confidence
+        confidence_phrases = ['I am confident', 'I am certain', 'I strongly believe']
+        uncertainty_phrases = ['I am unsure', 'I am not certain', 'It is possible', 'It might be']
         
-        # Check for comprehensive acceptance criteria
-        criteria = final_response.split("Acceptance Criteria:")[1].strip().split("\n") if "Acceptance Criteria:" in final_response else []
-        criteria_count = len(criteria)
-        if 3 <= criteria_count <= 5:
-            score += 0.2
-        elif criteria_count > 5:
-            score += 0.1
+        confidence_count = sum(phrase in response.lower() for phrase in confidence_phrases)
+        uncertainty_count = sum(phrase in response.lower() for phrase in uncertainty_phrases)
         
-        # Check for specificity in criteria
-        specific_criteria = sum(1 for c in criteria if any(keyword in c.lower() for keyword in ['must', 'should', 'will', 'can']))
-        score += min(specific_criteria * 0.05, 0.2)
+        # Calculate diversity of vocabulary
+        unique_words = len(set(words))
+        vocabulary_diversity = unique_words / word_count if word_count > 0 else 0
         
-        # Check for coverage of different aspects
-        aspects = ['technical', 'ux', 'business', 'quality', 'pega']
-        covered_aspects = sum(1 for aspect in aspects if aspect.lower() in final_response.lower())
-        score += covered_aspects * 0.04
+        # Calculate confidence score
+        base_confidence = min(word_count / 200, 1.0)  # Adjusted from 150 to 200
+        phrase_impact = (confidence_count - uncertainty_count) * 0.1
+        diversity_impact = vocabulary_diversity * 0.2
         
-        final_score = min(score, 1.0)
-        logger.info(f"Swarm Workflow: Quality assessment completed. Score: {final_score:.2f}")
-        return final_score
+        confidence = max(0, min(base_confidence + phrase_impact + diversity_impact, 1.0))
+        
+        logger.info(f"Confidence assessment: score = {confidence:.2f}, response length = {word_count} words, vocabulary diversity = {vocabulary_diversity:.2f}")
+        return confidence
 
     async def generate_final_summary(self, messages: List[Dict[str, str]], context_analysis: str) -> str:
         logger.info("Swarm Workflow: Generating final summary")
@@ -336,9 +354,85 @@ class Swarm:
             except Exception as e:
                 logger.error(f"Error in generate_final_summary attempt {attempt + 1}: {str(e)}")
         
-        logger.error("Swarm Workflow: Failed to generate a proper user story after multiple attempts. Returning a basic user story.")
+        logger.error("Swarm Workflow: Failed to generate a proper user story after multiple attempts. Returning a fallback user story.")
+        return self.generate_fallback_user_story(messages, context_analysis)
+
+    def generate_fallback_user_story(self, messages: List[Dict[str, str]], context_analysis: str) -> str:
+        logger.info("Swarm Workflow: Generating fallback user story")
         original_message = messages[0]['content']
-        return f"As a user, I want {original_message} so that I can complete my task effectively.\n\nAcceptance Criteria:\n1. The system should provide a clear interface for the user action.\n2. The process should be efficient and user-friendly.\n3. The system should provide clear feedback on the success or failure of the action."
+        
+        # Extract key elements from the original message
+        user_role = re.search(r"As an? (\w+)", original_message)
+        user_role = user_role.group(1) if user_role else "user"
+        
+        action = re.search(r"I want to (.+?) so that", original_message)
+        action = action.group(1) if action else "perform the specified action"
+        
+        outcome = re.search(r"so that (.+)", original_message)
+        outcome = outcome.group(1) if outcome else "the desired outcome is achieved"
+        
+        # Generate a basic user story
+        user_story = f"As a {user_role}, I want to {action} so that {outcome}."
+        
+        # Generate basic acceptance criteria
+        acceptance_criteria = [
+            "The system should provide a clear interface for the user action.",
+            "The process should be efficient and user-friendly.",
+            "The system should provide clear feedback on the success or failure of the action.",
+            f"The action should be compliant with relevant regulations and policies for {user_role}s.",
+            f"The system should maintain a detailed audit trail of the {action} process."
+        ]
+        
+        # Combine user story and acceptance criteria
+        fallback_story = f"{user_story}\n\nAcceptance Criteria:\n" + "\n".join(f"{i+1}. {criterion}" for i, criterion in enumerate(acceptance_criteria))
+        
+        logger.info(f"Swarm Workflow: Generated fallback user story: {fallback_story[:100]}...")
+        return fallback_story
+
+    def assess_quality(self, final_response: str) -> float:
+        logger.info("Swarm Workflow: Assessing quality of final response")
+        score = 0.0
+        
+        # Check for correct format (more stringent)
+        if re.match(r'^As a user, I want .+ so that .+\.', final_response.split('\n')[0]):
+            score += 0.3
+        else:
+            logger.warning("Swarm Workflow: User story format is incorrect")
+            return 0.0  # Immediate fail if format is incorrect
+        
+        if "Acceptance Criteria:" in final_response:
+            score += 0.2
+        else:
+            logger.warning("Swarm Workflow: Missing Acceptance Criteria section")
+            return 0.0  # Immediate fail if Acceptance Criteria is missing
+        
+        # Check for comprehensive acceptance criteria
+        criteria = final_response.split("Acceptance Criteria:")[1].strip().split("\n")
+        criteria_count = len(criteria)
+        if 3 <= criteria_count <= 5:
+            score += 0.2
+        else:
+            logger.warning(f"Swarm Workflow: Incorrect number of acceptance criteria: {criteria_count}")
+            return 0.0  # Immediate fail if criteria count is incorrect
+        
+        # Check for specificity in criteria
+        specific_keywords = ['must', 'should', 'will', 'can', 'needs to', 'is required to']
+        specific_criteria = sum(1 for c in criteria if any(keyword in c.lower() for keyword in specific_keywords))
+        score += min(specific_criteria * 0.1, 0.2)
+        
+        # Check for measurability in criteria
+        measurable_keywords = ['measured', 'tracked', 'quantified', 'percentage', 'number of', 'amount of']
+        measurable_criteria = sum(1 for c in criteria if any(keyword in c.lower() for keyword in measurable_keywords))
+        score += min(measurable_criteria * 0.05, 0.1)
+        
+        # Check for coverage of different aspects
+        aspects = ['technical', 'ux', 'business', 'quality', 'pega']
+        covered_aspects = sum(1 for aspect in aspects if aspect.lower() in final_response.lower())
+        score += covered_aspects * 0.04
+        
+        final_score = min(score, 1.0)
+        logger.info(f"Swarm Workflow: Quality assessment completed. Score: {final_score:.2f}")
+        return final_score
 
     def validate_final_response(self, response: str) -> bool:
         logger.info("Swarm Workflow: Validating final response")
@@ -391,15 +485,6 @@ class Swarm:
     def get_max_iterations(self) -> int:
         return self.max_iterations
 
-    # New: Method to assess confidence of an agent's response
-    def assess_confidence(self, response: str) -> float:
-        # This is a placeholder implementation. In a real-world scenario,
-        # you would implement a more sophisticated confidence assessment.
-        words = response.split()
-        confidence = min(len(words) / 100, 1.0)  # Simple heuristic based on response length
-        return confidence
-
-    # New: Method to consult other agents when confidence is low
     async def consult_other_agents(self, requesting_agent: Agent, response: str, tools_map: Dict) -> List[Dict[str, Any]]:
         logger.info(f"Swarm Workflow: {requesting_agent.name} is consulting other agents due to low confidence")
         consultation_results = []
@@ -414,9 +499,9 @@ class Swarm:
                 
                 logger.info(f"Swarm Workflow: Received input from {agent_name}")
         
+        logger.info(f"Swarm Workflow: Consultation complete. Received input from {len(consultation_results)} agents.")
         return consultation_results
 
-    # New: Method for Master Agent to request additional input
     async def request_additional_input(self, response: str, tools_map: Dict) -> List[Dict[str, Any]]:
         logger.info("Swarm Workflow: Master Agent is requesting additional input from specialists")
         additional_input_results = []

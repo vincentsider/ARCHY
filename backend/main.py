@@ -67,13 +67,19 @@ def rate_limit(limit_string):
 # Load configuration
 config = load_config("config.json")  # You can implement this function to load from a file
 
+# Check for API key
+if not os.getenv("OPENAI_API_KEY"):
+    logger.critical("OPENAI_API_KEY environment variable is not set")
+    raise ValueError("OPENAI_API_KEY environment variable is not set")
+
 # Create agents based on configuration
 agents = [
     Agent(
         name=agent_config.name,
+        api_key=os.getenv("OPENAI_API_KEY"),
+        model=config.openai_model,
         instructions=agent_config.instructions,
-        tools=[config.tools[tool] for tool in agent_config.tools],
-        model=config.openai_model
+        tools=agent_config.tools
     )
     for agent_config in config.agents
 ]
@@ -101,11 +107,6 @@ class OptimizationStatus(BaseModel):
     status: str
 
 optimization_status = OptimizationStatus(total_stories=0, processed_stories=0, status="idle")
-
-# Check for API key
-if not os.getenv("OPENAI_API_KEY"):
-    logger.critical("OPENAI_API_KEY environment variable is not set")
-    raise ValueError("OPENAI_API_KEY environment variable is not set")
 
 async def optimize_story_logic(content: str):
     """

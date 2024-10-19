@@ -1,24 +1,27 @@
 from openai import OpenAI
 import os
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Callable
 import logging
 import json
+import inspect
 
 logger = logging.getLogger(__name__)
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
 class Agent:
-    def __init__(self, name: str, instructions: str, tools: List[Any], model: str = "gpt-4-0613"):
+    def __init__(self, name: str, api_key: str, model: str = "gpt-4o", instructions: str = "", tools: List[Callable] = None):
         self.name = name
-        self.instructions = instructions
-        self.tools = tools
         self.model = model
+        self.instructions = instructions
+        self.tools = tools or []
+        self.client = OpenAI(api_key=api_key)
         logger.info(f"Agent {name} initialized with model {model}")
 
     async def get_completion(self, messages: List[Dict[str, str]], tool_schemas: List[Dict[str, Any]]) -> Any:
         logger.info(f"Agent {self.name}: Getting completion")
-        messages = [{"role": "system", "content": self.instructions}] + messages
+
+        # Add the instructions as the first system message if not already present
+        if not messages or messages[0]["role"] != "system":
+            messages.insert(0, {"role": "system", "content": self.instructions})
 
         kwargs = {
             "model": self.model,
@@ -32,26 +35,56 @@ class Agent:
 
         try:
             logger.debug(f"Agent {self.name}: Sending request to OpenAI API")
-            response = client.chat.completions.create(**kwargs)
+            response = self.client.chat.completions.create(**kwargs)
             logger.info(f"Agent {self.name}: Received response from OpenAI API")
             return response
         except Exception as e:
             logger.error(f"Agent {self.name}: Error in get_completion: {str(e)}")
             raise
 
-    def function_to_schema(self, func):
+    def function_to_schema(self, func: Callable) -> Dict[str, Any]:
         logger.debug(f"Agent {self.name}: Converting function to schema: {func.__name__}")
+        
+        type_map = {
+            str: "string",
+            int: "integer",
+            float: "number",
+            bool: "boolean",
+            list: "array",
+            dict: "object",
+            type(None): "null",
+        }
+
+        try:
+            signature = inspect.signature(func)
+        except ValueError as e:
+            raise ValueError(f"Failed to get signature for function {func.__name__}: {str(e)}")
+
+        parameters = {}
+        for param in signature.parameters.values():
+            try:
+                param_type = type_map.get(param.annotation, "string")
+            except KeyError as e:
+                raise KeyError(f"Unknown type annotation {param.annotation} for parameter {param.name}: {str(e)}")
+            parameters[param.name] = {"type": param_type}
+
+        required = [
+            param.name
+            for param in signature.parameters.values()
+            if param.default == inspect._empty
+        ]
+
         return {
             "type": "function",
             "function": {
                 "name": func.__name__,
-                "description": func.__doc__,
+                "description": (func.__doc__ or "").strip(),
                 "parameters": {
                     "type": "object",
-                    "properties": {},
-                    "required": []
-                }
-            }
+                    "properties": parameters,
+                    "required": required,
+                },
+            },
         }
 
     async def request_consultation(self, question: str, target_agent: 'Agent') -> str:
