@@ -9,7 +9,6 @@ from jira import JIRA
 from dotenv import load_dotenv
 import logging
 import asyncio
-from backend.swarm.swarm import Swarm
 from backend.swarm.agent import Agent
 from backend.config import Config, load_config
 
@@ -62,6 +61,9 @@ async def optimize_story(story: str):
     agents = [
         Agent(ac.name, OPENAI_API_KEY, config.openai_model, ac.instructions, ac.tools) for ac in config.agents
     ]
+    
+    # Import Swarm here to avoid circular import
+    from backend.swarm.swarm import Swarm
     swarm = Swarm(agents, config)
     
     # Create a tools_map dictionary
