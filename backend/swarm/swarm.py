@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Callable
 from .agent import Agent
 import json
 import asyncio
@@ -26,6 +26,8 @@ class Swarm:
         self.early_stopping_threshold = 0.8  # Quality threshold for early stopping
         self.config = config
         self.confidence_threshold = 0.7  # Adjusted from 0.9 to 0.7
+        self.tools_map = {tool.__name__: tool for tool in config.tools.values()}
+        self.max_handoffs = 3  # New attribute to limit handoffs
         logger.info(f"Swarm initialized with {len(agents)} agents")
 
     async def analyze_context(self, message: str) -> str:
@@ -112,9 +114,13 @@ class Swarm:
             logger.error(f"Error in process_message: {str(e)}")
             raise
 
-    async def run_agent(self, agent: Agent, messages: List[Dict[str, str]], tools_map: Dict) -> Response:
+    async def run_agent(self, agent: Agent, messages: List[Dict[str, str]], tools_map: Dict[str, Callable], handoff_count: int = 0) -> Response:
         logger.info(f"Swarm Workflow: Running agent: {agent.name}")
         
+        if handoff_count >= self.max_handoffs:
+            logger.warning(f"Swarm Workflow: Maximum handoffs reached for {agent.name}. Forcing decision.")
+            return await self.force_agent_decision(agent, messages, tools_map)
+
         # Create tool_schemas only for the tools that the agent has access to
         tool_schemas = [
             {
@@ -178,12 +184,12 @@ class Swarm:
                         # Handle the handoff
                         target_agent = self.agents.get(new_agent_name)
                         if target_agent:
-                            handoff_response = await self.run_agent(target_agent, messages + new_messages, tools_map)
+                            handoff_response = await self.run_agent(target_agent, messages + new_messages, tools_map, handoff_count + 1)
                             new_messages.extend(handoff_response.messages)
                             
                             # If the handoff was to a specialist, return to the original agent
                             if agent.name != "Master Agent" and new_agent_name != "Master Agent":
-                                review_response = await self.run_agent(agent, messages + new_messages + [{"role": "user", "content": f"Review the {new_agent_name}'s input and continue optimizing the user story."}], tools_map)
+                                review_response = await self.run_agent(agent, messages + new_messages + [{"role": "user", "content": f"Review the {new_agent_name}'s input and continue optimizing the user story."}], tools_map, handoff_count + 2)
                                 new_messages.extend(review_response.messages)
                         else:
                             logger.warning(f"Agent {new_agent_name} not found. Skipping handoff.")
@@ -214,6 +220,21 @@ class Swarm:
         except Exception as e:
             logger.error(f"Error in run_agent for {agent.name}: {str(e)}")
             raise
+
+    async def force_agent_decision(self, agent: Agent, messages: List[Dict[str, str]], tools_map: Dict[str, Callable]) -> Response:
+        logger.info(f"Swarm Workflow: Forcing decision for {agent.name}")
+        force_decision_message = {
+            "role": "system",
+            "content": "You must make a final decision now without consulting other agents. Summarize your thoughts and provide a concrete next step or conclusion."
+        }
+        response = await agent.get_completion(messages + [force_decision_message], [])
+        return Response(agent=agent, messages=[{
+            "role": "assistant",
+            "content": response.choices[0].message.content,
+            "agent_name": agent.name,
+            "decision": "Forced decision",
+            "tools_used": []
+        }], decision="Forced decision")
 
     async def execute_tool_call(self, tool_call, tools_map, agent_name):
         name = tool_call.function.name
@@ -336,11 +357,19 @@ class Swarm:
 
         summary_message = [{"role": "user", "content": summary_prompt}]
         
+        # Sanitize the 'name' field in messages
+        sanitized_messages = []
+        for message in messages:
+            sanitized_message = message.copy()
+            if 'name' in sanitized_message:
+                sanitized_message['name'] = re.sub(r'[^a-zA-Z0-9_-]', '_', sanitized_message['name'])
+            sanitized_messages.append(sanitized_message)
+        
         max_attempts = 5
         for attempt in range(max_attempts):
             try:
                 logger.info(f"Swarm Workflow: Generating final summary: Attempt {attempt + 1}")
-                summary_response = await self.master_agent.get_completion(summary_message + messages, [])
+                summary_response = await self.master_agent.get_completion(summary_message + sanitized_messages, [])
                 final_response = summary_response.choices[0].message.content
                 
                 logger.info(f"Swarm Workflow: Generated response: {final_response[:100]}...")
@@ -350,12 +379,12 @@ class Swarm:
                     return final_response
                 else:
                     logger.warning(f"Swarm Workflow: Attempt {attempt + 1} failed to generate proper user story format")
-                    messages.append({"role": "user", "content": "The previous response did not meet the required format and quality standards. Please try again, ensuring you follow all the guidelines provided, especially starting with EXACTLY 'As a user, I want...' and including EXACTLY 3-5 acceptance criteria. Do not include any additional text or explanations."})
+                    sanitized_messages.append({"role": "user", "content": "The previous response did not meet the required format and quality standards. Please try again, ensuring you follow all the guidelines provided, especially starting with EXACTLY 'As a user, I want...' and including EXACTLY 3-5 acceptance criteria. Do not include any additional text or explanations."})
             except Exception as e:
                 logger.error(f"Error in generate_final_summary attempt {attempt + 1}: {str(e)}")
         
         logger.error("Swarm Workflow: Failed to generate a proper user story after multiple attempts. Returning a fallback user story.")
-        return self.generate_fallback_user_story(messages, context_analysis)
+        return self.generate_fallback_user_story(sanitized_messages, context_analysis)
 
     def generate_fallback_user_story(self, messages: List[Dict[str, str]], context_analysis: str) -> str:
         logger.info("Swarm Workflow: Generating fallback user story")
