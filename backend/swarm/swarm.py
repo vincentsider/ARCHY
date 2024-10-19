@@ -132,6 +132,10 @@ class Swarm:
                 })
                 logger.info(f"Swarm Workflow: {agent.name} response: {message.content[:100]}...")
 
+                # Add reasoning for not consulting other agents
+                if not message.tool_calls:
+                    logger.info(f"Swarm Workflow: {agent.name} decided not to consult other agents. Reasoning: The agent found sufficient information to proceed without additional input.")
+
             if message.tool_calls:
                 for tool_call in message.tool_calls:
                     result = await self.execute_tool_call(tool_call, tools_map, agent.name)
@@ -141,12 +145,12 @@ class Swarm:
                         decision = f"Handoff to {new_agent_name}"
                         new_messages.append({
                             "role": "system",
-                            "content": f"Handoff to {new_agent_name}. Provide your input based on the Pega Specialist's request.",
+                            "content": f"Handoff to {new_agent_name}. Provide your input based on the {agent.name}'s request.",
                             "agent_name": agent.name,
                             "decision": decision,
                             "tools_used": [tool_call.function.name]
                         })
-                        logger.info(f"Swarm Workflow: Handoff from {agent.name} to {new_agent_name}")
+                        logger.info(f"Swarm Workflow: {agent.name} decided to consult {new_agent_name}. Reasoning: Additional expertise required in {new_agent_name}'s domain.")
                         
                         # Handle the handoff
                         target_agent = self.agents.get(new_agent_name)
@@ -154,10 +158,10 @@ class Swarm:
                             handoff_response = await self.run_agent(target_agent, messages + new_messages, tools_map)
                             new_messages.extend(handoff_response.messages)
                             
-                            # If the handoff was to a specialist, return to the Pega Specialist
-                            if agent.name == "Pega Specialist" and new_agent_name != "Master Agent":
-                                pega_review_response = await self.run_agent(agent, messages + new_messages + [{"role": "user", "content": "Review the specialist's input and continue optimizing the user story."}], tools_map)
-                                new_messages.extend(pega_review_response.messages)
+                            # If the handoff was to a specialist, return to the original agent
+                            if agent.name != "Master Agent" and new_agent_name != "Master Agent":
+                                review_response = await self.run_agent(agent, messages + new_messages + [{"role": "user", "content": f"Review the {new_agent_name}'s input and continue optimizing the user story."}], tools_map)
+                                new_messages.extend(review_response.messages)
                         else:
                             logger.warning(f"Agent {new_agent_name} not found. Skipping handoff.")
                     elif isinstance(result, str) and result.startswith("CONSULTATION:"):
