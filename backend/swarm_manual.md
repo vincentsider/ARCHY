@@ -7,12 +7,13 @@ The Swarm System is a multi-agent framework designed to optimize user stories th
 ## Table of Contents
 
 1. [System Components](#system-components)
-2. [System Flow](#system-flow)
-3. [Agent Creation](#agent-creation)
+2. [Swarm Logic Flow](#swarm-logic-flow)
+3. [Agent Creation and Configuration](#agent-creation-and-configuration)
 4. [Adding Tools and Handoffs](#adding-tools-and-handoffs)
 5. [Process Workflow](#process-workflow)
 6. [Quality Evaluation](#quality-evaluation)
 7. [Capturing the Final User Story](#capturing-the-final-user-story)
+8. [Customization and Extension](#customization-and-extension)
 
 ## System Components
 
@@ -22,18 +23,29 @@ The Swarm System is a multi-agent framework designed to optimize user stories th
 4. Swarm Logic (`swarm/swarm.py`)
 5. Tools (`swarm/tools.py`)
 
-## System Flow
+## Swarm Logic Flow
 
-1. **Configuration Loading**: The system starts by loading the configuration from `config.py`.
-2. **Agent Creation**: Agents are created in `main.py` based on the configuration.
-3. **Swarm Initialization**: The Swarm is initialized with the created agents.
-4. **User Story Processing**: When a user story is submitted, the Swarm processes it through multiple agents.
-5. **Agent Interactions**: Agents can hand off tasks to each other using transfer tools.
-6. **Story Optimization**: The final optimized story is returned after all agent interactions.
+The swarm logic follows these main steps:
 
-## Agent Creation
+1. **Initialization**: The swarm is initialized with a list of agents and a configuration object. Each agent is created with a name, API key, model, instructions, and tools.
 
-To create a new agent, follow these steps:
+2. **Context Analysis**: When a user story is received, the swarm first analyzes the context using the Master Agent to understand the main intent of the story.
+
+3. **Triage**: The swarm then triages the user story to determine which specialist agents are most relevant for the task.
+
+4. **Processing**: The swarm processes the message by iterating through the relevant agents. This step is not strictly sequential for all agents, but rather focuses on the agents deemed relevant during the triage step. Each relevant agent:
+   - Is provided with the user story and context analysis
+   - Processes the information and provides its specific input
+   - May consult other agents if its confidence is below a certain threshold
+   - Can use tools or request handoffs to other agents if needed
+
+5. **Feedback Loop**: After initial processing, the swarm enters a feedback loop where it generates a final summary, assesses its quality, and requests clarifications if needed.
+
+6. **Final Output**: The swarm generates an optimized user story with acceptance criteria based on the collective input from all relevant agents.
+
+## Agent Creation and Configuration
+
+To create a new agent:
 
 1. Update the `config.py` file to include the new agent configuration:
 
@@ -51,18 +63,18 @@ agents = [
 2. In `main.py`, ensure the agent is created when loading the configuration:
 
 ```python
-agents = []
-for agent_config in config.agents:
-    agent_tools = [config.tools[tool] for tool in agent_config.tools if tool in config.tools]
-    agent = Agent(
+agents = [
+    Agent(
         name=agent_config.name,
+        api_key=os.getenv("OPENAI_API_KEY"),
+        model=config.openai_model,
         instructions=agent_config.instructions,
-        tools=agent_tools,
-        model=config.openai_model
+        tools=agent_config.tools
     )
-    agents.append(agent)
+    for agent_config in config.agents
+]
 
-swarm = Swarm(agents)
+swarm = Swarm(agents, config)
 ```
 
 ## Adding Tools and Handoffs
@@ -82,13 +94,10 @@ def new_tool(param1: str, param2: int) -> str:
     return "Tool result"
 ```
 
-2. Update the `config.tools` dictionary in `main.py` to include the new tool:
+2. Add the tool to the `tools_map` in the Swarm class initialization:
 
 ```python
-config.tools = {
-    # ... existing tools ...
-    "new_tool": new_tool,
-}
+self.tools_map = {tool.__name__: tool for tool in config.tools.values()}
 ```
 
 3. Add the tool to the appropriate agent's configuration in `config.py`:
@@ -103,85 +112,51 @@ agents = [
 ]
 ```
 
-4. To implement a handoff, use a transfer tool in the agent's response:
+4. To implement a handoff, use a transfer function in `swarm/tools.py`:
 
 ```python
-return {
-    "content": "Transferring to Technical Requirements Agent for detailed analysis.",
-    "function_call": {
-        "name": "transfer_to_technical_requirements",
-        "arguments": "{}"
-    }
-}
+def transfer_to_new_agent():
+    return "HANDOFF:New Agent Name"
 ```
 
 ## Process Workflow
 
 1. **User Story Submission**: A user story is submitted through the `/optimize_story` endpoint.
-2. **Initial Processing**: The Swarm starts processing with the Master Agent.
-3. **Agent Analysis**: Each agent analyzes the story based on its specialization.
-4. **Tool Usage**: Agents can use tools to perform specific actions or analyses.
-5. **Handoffs**: Agents can transfer control to other agents using transfer tools.
-6. **Iteration**: The process continues through multiple agents until optimization is complete.
+2. **Context Analysis**: The Master Agent analyzes the context of the user story.
+3. **Triage**: The system determines which specialist agents are most relevant.
+4. **Agent Processing**: Relevant agents process the story, providing their specialized input.
+5. **Consultations and Handoffs**: Agents can consult each other or hand off tasks as needed.
+6. **Feedback Loop**: The system generates a summary, assesses quality, and may request clarifications.
 7. **Final Synthesis**: The Master Agent synthesizes all inputs into a final optimized user story.
 
 ## Quality Evaluation
 
-The quality of the optimized user story is evaluated using the `assess_quality` method in the `Swarm` class:
+The quality of the optimized user story is evaluated using the `assess_quality` method in the `Swarm` class. It checks for:
 
-```python
-def assess_quality(self, final_response: str) -> float:
-    score = 0.0
-    if final_response.startswith("As a user, I want"):
-        score += 0.3
-    if "so that" in final_response:
-        score += 0.2
-    if "Acceptance Criteria:" in final_response:
-        score += 0.2
-    
-    aspects = ['technical', 'ux', 'business', 'quality']
-    covered_aspects = sum(1 for aspect in aspects if aspect.lower() in final_response.lower())
-    score += covered_aspects * 0.075
-    
-    criteria_count = final_response.count("\n") - 1
-    score += min(criteria_count * 0.025, 0.25)
-    
-    return min(score, 1.0)
-```
-
-This method evaluates the story based on:
-- Proper user story format
-- Inclusion of "so that" clause
-- Presence of acceptance criteria
+- Correct user story format
+- Presence of "so that" clause
+- Inclusion of acceptance criteria
 - Coverage of different aspects (technical, UX, business, quality)
-- Number of detailed criteria
+- Number and specificity of acceptance criteria
 
 ## Capturing the Final User Story
 
-The final optimized user story is captured in the `optimize_story` function in `main.py`:
+The final optimized user story is captured in the `optimize_story` function in `main.py`. It's returned as part of the `OptimizedUserStory` object and logged for easy integration with other systems like Jira.
 
-```python
-@app.post("/optimize_story", response_model=OptimizedUserStory)
-@rate_limit("5/minute")
-async def optimize_story(user_story: UserStory, request: Request):
-    try:
-        optimized, agent_interactions, performance_metrics = await optimize_story_cached(user_story.content)()
-        
-        # Log the final user story for easy access and integration
-        logger.info(f"Final User Story for Jira Integration:\n{optimized}")
-        
-        return OptimizedUserStory(
-            original=user_story.content,
-            optimized=optimized,
-            agent_interactions=agent_interactions,
-            model=config.openai_model,
-            performance_metrics=performance_metrics
-        )
-    except Exception as e:
-        logger.error(f"Error occurred while optimizing story: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"An error occurred while optimizing the story: {str(e)}")
-```
+## Customization and Extension
 
-The optimized story is logged and returned as part of the `OptimizedUserStory` object, which can be easily integrated with other platforms like Jira.
+To customize or extend the swarm system:
 
-By following this guide, users can fully customize the swarm system, adding new agents, tools, and modifying the optimization process as needed. The provided code snippets and examples should help in understanding and implementing changes to the system.
+1. **Add New Agents**: Create new agent configurations in `config.py` and update `main.py` to include them in the swarm.
+
+2. **Modify Existing Agents**: Update the instructions or tools for existing agents in `config.py`.
+
+3. **Add New Tools**: Define new tool functions in `swarm/tools.py` and add them to the relevant agents' configurations.
+
+4. **Adjust Swarm Logic**: Modify the `process_message` method in `swarm/swarm.py` to change how the swarm processes user stories.
+
+5. **Enhance Quality Evaluation**: Update the `assess_quality` method in `swarm/swarm.py` to refine how story quality is assessed.
+
+6. **Extend API Functionality**: Add new endpoints or modify existing ones in `main.py` to provide additional features or integration points.
+
+By following this guide, you can fully customize the swarm system, adding new agents, tools, and modifying the optimization process as needed.

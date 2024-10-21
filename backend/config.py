@@ -1,5 +1,11 @@
 from typing import List, Callable
 from pydantic import BaseModel
+from backend.swarm.tools import (
+    look_up_item, execute_refund,
+    transfer_to_technical_requirements, transfer_to_ux,
+    transfer_to_qa, transfer_to_stakeholder_liaison, transfer_to_master,
+    transfer_to_pega_specialist
+)
 
 class AgentConfig(BaseModel):
     name: str
@@ -10,37 +16,55 @@ class Config(BaseModel):
     openai_model: str = "gpt-4o"
     agents: List[AgentConfig]
     tools: dict[str, Callable]
+    max_clarification_rounds: int = 3
+    quality_threshold: float = 0.8
 
 # Default configuration
 default_config = Config(
     agents=[
         AgentConfig(
+            name="Master Agent",
+            instructions="You are the Master Agent responsible for coordinating the optimization of user stories. Your role is to analyze the initial user story, decide which specialist agents to involve, and synthesize their inputs into a final, optimized user story. Use your judgment to determine which agents are necessary for each story, and don't hesitate to involve multiple agents if needed. Your goal is to produce a comprehensive, well-rounded user story that covers technical, UX, business aspects, and Pega-specific considerations as appropriate. When synthesizing the final user story, ensure it follows the format 'As a user, I want... so that...' followed by a prioritized list of acceptance criteria.",
+            tools=["transfer_to_technical_requirements", "transfer_to_ux", "transfer_to_qa", "transfer_to_stakeholder_liaison", "transfer_to_pega_specialist"]
+        ),
+        AgentConfig(
             name="Technical Requirements Agent",
-            instructions="You are a Technical Analyst. Focus on the technical feasibility and requirements of each user story.",
-            tools=["look_up_item", "transfer_to_ux", "transfer_to_qa", "transfer_to_stakeholder_liaison", "transfer_to_master"]
+            instructions="You are the Technical Requirements Agent. Your role is to analyze user stories from a technical perspective and break them down into specific technical requirements. Focus on the technical feasibility and implementation details of each user story.",
+            tools=["look_up_item", "transfer_to_master"]
         ),
         AgentConfig(
             name="User Experience Agent",
-            instructions="You are a UX Designer. Ensure user stories reflect end-user needs and usability standards.",
-            tools=["transfer_to_technical_requirements", "transfer_to_qa", "transfer_to_stakeholder_liaison", "transfer_to_master"]
+            instructions="You are the UX Agent. Your role is to optimize user stories by considering the user experience perspective. Focus on usability, accessibility, and user interface design considerations. Ensure user stories reflect end-user needs and usability standards.",
+            tools=["transfer_to_master"]
         ),
         AgentConfig(
             name="Quality Assurance Agent",
-            instructions="You are a QA Specialist. Focus on making user stories testable and ensuring clarity for QA.",
-            tools=["transfer_to_technical_requirements", "transfer_to_ux", "transfer_to_stakeholder_liaison", "transfer_to_master"]
+            instructions="You are the QA Agent. Your role is to review and refine user stories to ensure they are testable and meet quality standards. Focus on defining acceptance criteria, identifying potential edge cases, and ensuring clarity for QA processes.",
+            tools=["transfer_to_master"]
         ),
         AgentConfig(
             name="Stakeholder Liaison Agent",
-            instructions="You are a Stakeholder Representative. Ensure alignment with business priorities and capture input from stakeholders.",
-            tools=["execute_refund", "transfer_to_technical_requirements", "transfer_to_ux", "transfer_to_qa", "transfer_to_master"]
+            instructions="You are the Stakeholder Liaison Agent. Your role is to review the optimized user story and ensure it aligns with business goals and user needs. Provide specific business-related acceptance criteria and suggest any necessary adjustments to meet stakeholder expectations. Ensure alignment with business priorities and capture input from stakeholders.",
+            tools=["execute_refund", "transfer_to_master"]
         ),
         AgentConfig(
-            name="Master Agent",
-            instructions="You are a Lead Business Analyst. Your role is to oversee and guide the improvement of user stories.",
-            tools=["transfer_to_technical_requirements", "transfer_to_ux", "transfer_to_qa", "transfer_to_stakeholder_liaison"]
+            name="Pega Specialist",
+            instructions="You are the Pega Specialist (Senior Lead System Architect). Your role is to provide expert input on implementing user stories in the Pega platform. Focus on Pega-specific considerations, best practices, and architectural decisions. Ensure that user stories are optimized for efficient implementation in Pega, considering features like case management, decision management, and UI design capabilities specific to Pega. If you need input from other specialists, use the appropriate handoff tool (e.g., transfer_to_technical_requirements). After consulting, you will receive the response and can continue your analysis.",
+            tools=["transfer_to_master", "transfer_to_technical_requirements", "transfer_to_ux", "transfer_to_qa", "transfer_to_stakeholder_liaison"]
         )
     ],
-    tools={}  # This will be populated in main.py
+    tools={
+        "look_up_item": look_up_item,
+        "execute_refund": execute_refund,
+        "transfer_to_technical_requirements": transfer_to_technical_requirements,
+        "transfer_to_ux": transfer_to_ux,
+        "transfer_to_qa": transfer_to_qa,
+        "transfer_to_stakeholder_liaison": transfer_to_stakeholder_liaison,
+        "transfer_to_master": transfer_to_master,
+        "transfer_to_pega_specialist": transfer_to_pega_specialist,
+    },
+    max_clarification_rounds=3,
+    quality_threshold=0.8
 )
 
 # Function to load custom configuration

@@ -7,21 +7,8 @@
   },
   {
     "conversation": [
-      {"role": "user", "content": "As a User, I want to record the date of loss so that the timeline of the incident is documented."}
-    ],
-    "function": "optimize_story"
-  },
-  {
-    "conversation": [
-      {"role": "user", "content": "As a User, I want to identify the loss/claim type so that the claim can be categorized correctly."}
-    ],
-    "function": "optimize_story"
-  },
-  {
-    "conversation": [
-      {"role": "user", "content": "As a User, I want to capture additional claims details so that all relevant information is available for processing."}
+      {"role": "user", "content": "As a Claims Adjuster, I want to implement a multi-factor authentication system for high-value claims processing that integrates with our existing Pega platform, ensures compliance with industry regulations, provides a user-friendly experience, and allows for detailed audit trails, so that we can enhance security, reduce fraud, and streamline the claims verification process for both adjusters and policyholders."}
     ],
     "function": "optimize_story"
   }
-
 ]
